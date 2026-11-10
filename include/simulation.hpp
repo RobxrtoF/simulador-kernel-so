@@ -24,6 +24,8 @@
 #include <string>
 #include <vector>
 
+#include "gantt.hpp"
+#include "metrics.hpp"
 #include "pcb.hpp"
 #include "process_table.hpp"
 #include "scheduling_policy.hpp"
@@ -70,6 +72,14 @@ public:
     int runningPid() const { return runningPid_; }
     const std::deque<int>& readyQueue() const { return ready_; }
     const ProcessTable& table() const { return table_; }
+    /// Ticks en los que la CPU estuvo ocupada.
+    long busyTicks() const { return busyTicks_; }
+    /// Historial de ejecución (diagrama de Gantt).
+    const GanttChart& gantt() const { return gantt_; }
+    /// Métricas globales calculadas a partir de los PCB.
+    SystemStats stats() const;
+    /// true si la CPU está libre pero quedan procesos sin terminar.
+    bool cpuIdleWithPendingWork() const { return runningPid_ == kNoPid && hasUnfinishedWork(); }
 
     /// Libera la memoria dinámica de todos los PCB. Devuelve cuántos se liberaron.
     std::size_t releaseAll();
@@ -81,6 +91,8 @@ private:
     ProcessTable table_;                        ///< Dueña de los PCB.
     std::deque<int> ready_;                     ///< Cola de LISTOS (PIDs).
     std::unique_ptr<SchedulingPolicy> policy_;  ///< Política activa (Strategy).
+    GanttChart gantt_;                          ///< Historial de ejecución.
+    long busyTicks_ = 0;                        ///< Ticks con CPU ocupada.
     long clock_ = 0;                            ///< Reloj simulado (ticks).
     int runningPid_ = kNoPid;                   ///< Proceso en EJECUCIÓN.
 };
