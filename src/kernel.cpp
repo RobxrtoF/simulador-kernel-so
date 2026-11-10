@@ -76,6 +76,11 @@ void Kernel::setPolicy(PolicyKind kind, int quantum) {
     sim_.setPolicy(kind, quantum);
 }
 
+void Kernel::setAging(int ticks) {
+    MutexGuard lock(mutex_);
+    sim_.setAging(ticks);
+}
+
 void Kernel::setSpeed(int msPerTick) {
     MutexGuard lock(mutex_);
     msPerTick_ = std::max(1, msPerTick);
@@ -118,6 +123,8 @@ SystemSnapshot Kernel::snapshot() const {
     snap.engineRunning = running_;
     snap.msPerTick = msPerTick_;
     snap.policy = sim_.policy().describe();
+    snap.policyKind = sim_.policy().kind();
+    snap.agingInterval = sim_.agingInterval();
     snap.runningPid = sim_.runningPid();
     snap.cpuIdleWithPendingWork = sim_.cpuIdleWithPendingWork();
     snap.processes = sim_.table().snapshot();

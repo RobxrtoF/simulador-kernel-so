@@ -70,6 +70,8 @@ const std::vector<Cli::Command>& Cli::commands() {
         {"pcb", 1, 1, "pcb <PID>", "Detalle del Process Control Block de un proceso.", &Cli::cmdPcb},
         {"set_sched", 1, 2, "set_sched <RR|SRTF> [quantum]",
          "Cambia la política (RR: quantum > 0, defecto 2). Se puede usar en caliente.", &Cli::cmdSetSched},
+        {"set_aging", 1, 1, "set_aging <ticks>",
+         "Envejecimiento de SRTF contra la inanición (0 = desactivado, defecto).", &Cli::cmdSetAging},
         {"set_speed", 1, 1, "set_speed <ms_por_tick>",
          "Duración real de cada tick de CPU (50 a 5000 ms; defecto 1000).", &Cli::cmdSetSpeed},
         {"start", 0, 0, "start", "Inicia o reanuda el reloj de CPU (Hilo Motor).", &Cli::cmdStart},
@@ -307,6 +309,30 @@ void Cli::cmdSetSched(const Args& args) {
     const std::string upper = toUpper(algorithm);
     if (upper == "RR" || upper == "SRTF") {
         out_ << "Sugerencia: el nombre distingue mayúsculas; escriba '" << upper << "'.\n";
+    }
+}
+
+void Cli::cmdSetAging(const Args& args) {
+    long ticks = 0;
+    if (!readInteger(args[0], "El intervalo de envejecimiento debe ser un número entero de ticks.", ticks)) return;
+    if (ticks < 0) {
+        out_ << "[ERROR DE PARAMETRO]: El intervalo de envejecimiento debe ser un entero mayor o igual que 0 "
+                "(0 = desactivado).\n";
+        return;
+    }
+    kernel_.setAging(static_cast<int>(ticks));
+
+    const SystemSnapshot snap = kernel_.snapshot();
+    if (ticks == 0) {
+        out_ << "[OK]: Envejecimiento desactivado (SRTF puro).";
+    } else {
+        out_ << "[OK]: Envejecimiento activado: por cada " << ticks << (ticks == 1 ? " tick" : " ticks")
+             << " de espera, la ráfaga efectiva del proceso baja 1 tick.";
+    }
+    if (snap.policyKind == PolicyKind::SRTF) {
+        out_ << " Política: " << snap.policy << ".\n";
+    } else {
+        out_ << " Se aplica con SRTF (política actual: " << snap.policy << ").\n";
     }
 }
 
