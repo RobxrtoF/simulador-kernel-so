@@ -66,6 +66,16 @@ public:
     void setPolicy(PolicyKind kind, int quantum = kDefaultQuantum);
     const SchedulingPolicy& policy() const { return *policy_; }
 
+    /**
+     * @brief Activa (ticks > 0) o desactiva (kAgingOff) el envejecimiento de SRTF.
+     *
+     * El valor se conserva aunque se cambie de política: si la política activa
+     * es SRTF se aplica de inmediato; si es Round Robin, al volver a SRTF.
+     */
+    void setAging(int ticks);
+    /// Intervalo de envejecimiento configurado (kAgingOff = SRTF puro).
+    int agingInterval() const { return agingInterval_; }
+
     // -------------------------------------------------------- avance del tiempo
     /// true si existe algún proceso sin terminar (hay trabajo pendiente).
     bool hasUnfinishedWork() const { return table_.hasUnfinished(); }
@@ -100,6 +110,7 @@ private:
     long busyTicks_ = 0;                        ///< Ticks con CPU ocupada.
     long clock_ = 0;                            ///< Reloj simulado (ticks).
     int runningPid_ = kNoPid;                   ///< Proceso en EJECUCIÓN.
+    int agingInterval_ = kAgingOff;             ///< Envejecimiento de SRTF (desactivado por defecto).
 };
 
 }  // namespace sim

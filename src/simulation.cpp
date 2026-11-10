@@ -76,8 +76,14 @@ bool Simulation::unblockProcess(int pid, std::string& error) {
 // -------------------------------------------------------------- planificación
 
 void Simulation::setPolicy(PolicyKind kind, int quantum) {
-    policy_ = makePolicy(kind, quantum);
+    policy_ = makePolicy(kind, quantum, agingInterval_);
     if (PCB* running = table_.find(runningPid_)) running->quantumUsed = 0;
+}
+
+void Simulation::setAging(int ticks) {
+    agingInterval_ = ticks > 0 ? ticks : kAgingOff;
+    // SrtfPolicy no guarda más estado que el intervalo: recrearla es seguro.
+    if (policy_->kind() == PolicyKind::SRTF) policy_ = makePolicy(PolicyKind::SRTF, kDefaultQuantum, agingInterval_);
 }
 
 void Simulation::decide() {
