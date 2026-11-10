@@ -60,6 +60,10 @@ void Simulation::step() {
     if (current != nullptr) {
         --current->burstRemaining;
         ++current->quantumUsed;
+        ++busyTicks_;
+        gantt_.record(clock_, current->pid, current->name);
+    } else {
+        gantt_.record(clock_, kNoPid, "IDLE");  // CPU ociosa en este tick
     }
 
     // 3) Todos los procesos en la cola de LISTOS acumulan un tick de espera.
@@ -82,6 +86,10 @@ void Simulation::step() {
 }
 
 // ------------------------------------------------------------------ consultas
+
+SystemStats Simulation::stats() const {
+    return computeStats(table_.snapshot(), clock_, busyTicks_);
+}
 
 std::size_t Simulation::releaseAll() {
     ready_.clear();
