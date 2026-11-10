@@ -192,3 +192,13 @@ TEST_CASE("CLI load: errores de archivo y de formato no detienen la shell") {
     cli.execute("load");
     CHECK(contains(out.str(), "Uso correcto: load <archivo>"));
 }
+
+TEST_CASE("Lotes: un nombre simple que no existe se busca en la carpeta de trazas") {
+    TempFile trace(kScenario2);                                   // /tmp/traza_XXXXXX
+    const std::string name = trace.path().substr(trace.path().rfind('/') + 1);
+    CHECK_EQ(resolveWorkloadPath(name, "/tmp"), trace.path());    // como 'load workload_test.txt'
+    CHECK_EQ(resolveWorkloadPath(trace.path(), "/nada"), trace.path());  // existe: tal cual
+    CHECK_EQ(resolveWorkloadPath("no_existe.txt", "/tmp"), std::string("no_existe.txt"));
+    CHECK_EQ(resolveWorkloadPath("otra/" + name, "/tmp"), "otra/" + name);  // ruta explícita: sin buscar
+    CHECK_EQ(resolveWorkloadPath("/tmp", "/tmp"), std::string("/tmp"));    // directorio: lo rechaza el parser
+}
