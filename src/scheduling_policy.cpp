@@ -1,6 +1,6 @@
 /**
  * @file scheduling_policy.cpp
- * @brief Implementación de Round Robin y de las operaciones de despacho/desalojo.
+ * @brief Implementación de Round Robin, SRTF y de las operaciones de despacho/desalojo.
  */
 #include "scheduling_policy.hpp"
 
@@ -55,11 +55,46 @@ void RoundRobinPolicy::decide(SchedContext& ctx) {
 }
 
 // ----------------------------------------------------------------------------
+// Shortest Remaining Time First (apropiativo)
+// ----------------------------------------------------------------------------
+
+std::string SrtfPolicy::describe() const { return "SRTF (apropiativo)"; }
+
+bool SrtfPolicy::goesBefore(const PCB& a, const PCB& b) {
+    if (a.burstRemaining != b.burstRemaining) return a.burstRemaining < b.burstRemaining;
+    if (a.priority != b.priority) return a.priority < b.priority;
+    if (a.arrivalTime != b.arrivalTime) return a.arrivalTime < b.arrivalTime;
+    return a.pid < b.pid;
+}
+
+void SrtfPolicy::decide(SchedContext& ctx) {
+    if (ctx.ready.empty()) return;  // nadie compite por la CPU
+
+    // Mejor candidato de la cola de LISTOS.
+    const PCB* best = nullptr;
+    for (int pid : ctx.ready) {
+        const PCB* candidate = ctx.table.find(pid);
+        if (candidate != nullptr && (best == nullptr || goesBefore(*candidate, *best))) best = candidate;
+    }
+    if (best == nullptr) return;
+
+    const PCB* current = ctx.running();
+    if (current != nullptr) {
+        const bool shorter = best->burstRemaining < current->burstRemaining;
+        const bool tieButHigherPriority =
+            best->burstRemaining == current->burstRemaining && best->priority < current->priority;
+        if (!shorter && !tieButHigherPriority) return;  // el actual sigue ejecutando
+        preemptRunning(ctx);                            // desalojo inmediato
+    }
+    dispatch(ctx, best->pid);
+}
+
+// ----------------------------------------------------------------------------
 // Fábrica
 // ----------------------------------------------------------------------------
 
 std::unique_ptr<SchedulingPolicy> makePolicy(PolicyKind kind, int quantum) {
-    (void)kind;  // por ahora solo existe Round Robin
+    if (kind == PolicyKind::SRTF) return std::make_unique<SrtfPolicy>();
     return std::make_unique<RoundRobinPolicy>(quantum);
 }
 

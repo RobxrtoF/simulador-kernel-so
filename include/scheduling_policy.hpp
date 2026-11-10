@@ -2,7 +2,7 @@
  * @file scheduling_policy.hpp
  * @brief Políticas de planificación de CPU (patrón Strategy).
  *
- * Política implementada: Round Robin.
+ * Políticas implementadas: Round Robin y Shortest Remaining Time First (SRTF).
  * Cada política solo decide QUÉ proceso ocupa la CPU en un instante dado; el
  * avance del reloj y la contabilidad de tiempos los hace Simulation::step().
  */
@@ -19,7 +19,7 @@
 namespace sim {
 
 /// Algoritmos de planificación disponibles.
-enum class PolicyKind { RoundRobin };
+enum class PolicyKind { RoundRobin, SRTF };
 
 /// Quantum por defecto de Round Robin (ticks).
 constexpr int kDefaultQuantum = 2;
@@ -87,6 +87,28 @@ public:
 
 private:
     int quantum_;
+};
+
+/**
+ * @brief Shortest Remaining Time First (apropiativo).
+ *
+ * Siempre ejecuta el proceso con MENOR ráfaga restante. Cuando llega (o se
+ * desbloquea) un proceso con ráfaga restante estrictamente menor que la del
+ * proceso en ejecución, este es desalojado de inmediato.
+ *
+ * Desempates (criterio "SRTF / Prioridades apropiativo"):
+ *   1) menor ráfaga restante, 2) mayor prioridad (número menor),
+ *   3) llegada más temprana, 4) PID menor.
+ * Solo se desaloja al proceso en ejecución si el candidato tiene menos ráfaga
+ * restante, o igual ráfaga y mejor prioridad (evita cambios de contexto inútiles).
+ */
+class SrtfPolicy : public SchedulingPolicy {
+public:
+    PolicyKind kind() const override { return PolicyKind::SRTF; }
+    std::string describe() const override;
+    void decide(SchedContext& ctx) override;
+    /// true si `a` debe ejecutarse antes que `b` según SRTF y sus desempates.
+    static bool goesBefore(const PCB& a, const PCB& b);
 };
 
 /// Crea la política indicada (el quantum solo aplica a Round Robin).
