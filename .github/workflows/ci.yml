@@ -26,3 +26,9 @@ jobs:
           cmake -S . -B build-cmake
           cmake --build build-cmake -j"$(nproc)"
           ctest --test-dir build-cmake --output-on-failure
+
+      # ThreadSanitizer necesita menos entropía de ASLR en los runners recientes.
+      - name: Pruebas bajo ThreadSanitizer (data races)
+        run: |
+          sudo sysctl vm.mmap_rnd_bits=28
+          make tsan
