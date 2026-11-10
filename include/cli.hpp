@@ -82,6 +82,8 @@ private:
     void cmdSetSpeed(const Args& args);
     void cmdStart(const Args& args);
     void cmdPause(const Args& args);
+    void cmdBlock(const Args& args);
+    void cmdUnblock(const Args& args);
     void cmdGantt(const Args& args);
     void cmdStats(const Args& args);
     void cmdGui(const Args& args);

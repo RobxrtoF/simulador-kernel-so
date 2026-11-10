@@ -69,6 +69,10 @@ public:
      * ARRIVAL_TIME = a llega en baseTick + a. Devuelve copias de los PCB creados.
      */
     std::vector<PCB> loadProcesses(const std::vector<ProcessSpec>& specs, long& baseTick);
+    /// Pasa un proceso LISTO o en EJECUCIÓN a BLOQUEADO.
+    bool blockProcess(int pid, std::string& error);
+    /// Devuelve un proceso BLOQUEADO a la cola de LISTOS.
+    bool unblockProcess(int pid, std::string& error);
     /// Cambia la política de planificación en caliente.
     void setPolicy(PolicyKind kind, int quantum);
     /// Cambia la duración real de cada tick (la CLI valida el rango 50-5000 ms).

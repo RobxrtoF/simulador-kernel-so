@@ -56,6 +56,11 @@ public:
     /// Admite a LISTOS (en orden de llegada y PID) los procesos NUEVOS cuya llegada ya ocurrió.
     void admitArrivals();
 
+    /// Bloquea un proceso LISTO o en EJECUCIÓN. Devuelve false (y el motivo) si no es posible.
+    bool blockProcess(int pid, std::string& error);
+    /// Devuelve un proceso BLOQUEADO al final de la cola de LISTOS.
+    bool unblockProcess(int pid, std::string& error);
+
     // ------------------------------------------------------------ planificación
     /// Cambia la política activa (en caliente). El proceso en ejecución inicia una porción nueva.
     void setPolicy(PolicyKind kind, int quantum = kDefaultQuantum);
