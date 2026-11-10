@@ -36,6 +36,43 @@ void Simulation::admitArrivals() {
     }
 }
 
+bool Simulation::blockProcess(int pid, std::string& error) {
+    PCB* pcb = table_.find(pid);
+    if (pcb == nullptr) {
+        error = "No existe un proceso con PID " + std::to_string(pid) + ".";
+        return false;
+    }
+    if (pcb->state == ProcessState::Running) {
+        runningPid_ = kNoPid;  // libera la CPU; el despachador elige otro en el próximo tick
+        pcb->quantumUsed = 0;
+        if (pcb->executedTime() == 0) pcb->startTime = kUnset;
+    } else if (pcb->state == ProcessState::Ready) {
+        ready_.erase(std::remove(ready_.begin(), ready_.end(), pid), ready_.end());
+    } else {
+        error = "Solo se pueden bloquear procesos READY o RUNNING (PID " + std::to_string(pid) +
+                " está " + stateName(pcb->state) + ").";
+        return false;
+    }
+    pcb->state = ProcessState::Blocked;
+    return true;
+}
+
+bool Simulation::unblockProcess(int pid, std::string& error) {
+    PCB* pcb = table_.find(pid);
+    if (pcb == nullptr) {
+        error = "No existe un proceso con PID " + std::to_string(pid) + ".";
+        return false;
+    }
+    if (pcb->state != ProcessState::Blocked) {
+        error = "El proceso PID " + std::to_string(pid) + " no está bloqueado (está " +
+                stateName(pcb->state) + ").";
+        return false;
+    }
+    pcb->state = ProcessState::Ready;
+    ready_.push_back(pid);
+    return true;
+}
+
 // -------------------------------------------------------------- planificación
 
 void Simulation::setPolicy(PolicyKind kind, int quantum) {

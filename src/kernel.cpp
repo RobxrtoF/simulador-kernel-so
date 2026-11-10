@@ -59,6 +59,18 @@ std::vector<PCB> Kernel::loadProcesses(const std::vector<ProcessSpec>& specs, lo
     return created;
 }
 
+bool Kernel::blockProcess(int pid, std::string& error) {
+    MutexGuard lock(mutex_);
+    return sim_.blockProcess(pid, error);
+}
+
+bool Kernel::unblockProcess(int pid, std::string& error) {
+    MutexGuard lock(mutex_);
+    const bool ok = sim_.unblockProcess(pid, error);
+    if (ok) pthread_cond_signal(&wakeEngine_);
+    return ok;
+}
+
 void Kernel::setPolicy(PolicyKind kind, int quantum) {
     MutexGuard lock(mutex_);
     sim_.setPolicy(kind, quantum);
