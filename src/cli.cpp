@@ -74,6 +74,9 @@ const std::vector<Cli::Command>& Cli::commands() {
          "Duración real de cada tick de CPU (50 a 5000 ms; defecto 1000).", &Cli::cmdSetSpeed},
         {"start", 0, 0, "start", "Inicia o reanuda el reloj de CPU (Hilo Motor).", &Cli::cmdStart},
         {"pause", 0, 0, "pause", "Pausa el reloj de CPU para inspeccionar el sistema.", &Cli::cmdPause},
+        {"block", 1, 1, "block <PID>", "Bloquea un proceso READY o RUNNING (estado BLOCKED).", &Cli::cmdBlock},
+        {"unblock", 1, 1, "unblock <PID>", "Devuelve un proceso bloqueado a la cola de LISTOS.",
+         &Cli::cmdUnblock},
         {"gantt", 0, 0, "gantt", "Diagrama de Gantt acumulado hasta el instante actual.", &Cli::cmdGantt},
         {"stats", 0, 0, "stats", "Métricas globales: espera, retorno, respuesta y uso de CPU.",
          &Cli::cmdStats},
@@ -340,6 +343,29 @@ void Cli::cmdPause(const Args&) {
     }
     out_ << "[OK]: Reloj de CPU en pausa en t=" << kernel_.snapshot().clock
          << ". Use 'start' para reanudar.\n";
+}
+
+void Cli::cmdBlock(const Args& args) {
+    int pid = 0;
+    if (!readPid(args[0], pid)) return;
+    std::string error;
+    if (!kernel_.blockProcess(pid, error)) {
+        out_ << "[ERROR DE PARAMETRO]: " << error << '\n';
+        return;
+    }
+    out_ << "[OK]: Proceso PID " << pid << " bloqueado (BLOCKED). Use 'unblock " << pid
+         << "' para devolverlo a LISTOS.\n";
+}
+
+void Cli::cmdUnblock(const Args& args) {
+    int pid = 0;
+    if (!readPid(args[0], pid)) return;
+    std::string error;
+    if (!kernel_.unblockProcess(pid, error)) {
+        out_ << "[ERROR DE PARAMETRO]: " << error << '\n';
+        return;
+    }
+    out_ << "[OK]: Proceso PID " << pid << " desbloqueado: vuelve a la cola de LISTOS (READY).\n";
 }
 
 void Cli::cmdGantt(const Args&) {
