@@ -7,6 +7,7 @@
 #  Objetivos:
 #    make          Compila el ejecutable ./simulador
 #    make test     Compila y ejecuta las pruebas unitarias
+#    make e2e      Ejecuta los escenarios de prueba del enunciado (CLI real)
 #    make tsan     Repite las pruebas con ThreadSanitizer (detecta data races)
 #    make clean    Elimina los artefactos de compilación
 # =============================================================================
@@ -31,7 +32,7 @@ TEST_BIN := $(BUILD)/run_tests
 TSAN_VARS := BUILD=$(BUILD)-tsan BIN=$(BUILD)-tsan/simulador \
              OPT="-O1 -g -fsanitize=thread" LDFLAGS="-pthread -fsanitize=thread"
 
-.PHONY: all test tsan clean
+.PHONY: all test e2e tsan clean
 
 all: $(BIN)
 
@@ -50,8 +51,12 @@ $(TEST_BIN): $(LIB_OBJ) $(TEST_OBJ)
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
+e2e: $(BIN)
+	./tests/e2e/run_all.sh ./$(BIN)
+
 tsan:
 	$(MAKE) $(TSAN_VARS) all test
+	TSAN_OPTIONS="halt_on_error=1" ./tests/e2e/run_all.sh $(BUILD)-tsan/simulador
 
 $(BUILD) $(BUILD)/tests:
 	mkdir -p $@
