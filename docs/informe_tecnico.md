@@ -84,6 +84,8 @@ La política es idempotente: repetir la decisión en el mismo instante no la alt
 
 **SRTF apropiativo.** Siempre ejecuta el proceso con menor ráfaga restante. Si llega o se desbloquea un proceso con ráfaga restante estrictamente menor que la del proceso en ejecución, este es desalojado de inmediato. Los empates se resuelven por prioridad (criterio de prioridades apropiativo), luego por llegada y por PID; con igual ráfaga e igual prioridad no se desaloja, para evitar cambios de contexto inútiles.
 
+**Inanición y envejecimiento (opcional).** SRTF es un caso particular de la planificación por prioridades en el que la prioridad es la ráfaga restante (Silberschatz, §5.3.3), así que un proceso largo puede postergarse indefinidamente mientras sigan llegando procesos cortos. El comando `set_aging N`, desactivado por defecto, aplica a esa clave la técnica de envejecimiento del libro: la política compara la *ráfaga efectiva* = ráfaga restante − (espera en LISTOS / N), con división entera, tanto al elegir candidato como al decidir un desalojo. Subir la prioridad (1–5) no serviría, porque en SRTF solo desempata a igual ráfaga. La espera acumulada no se pierde al obtener la CPU, de modo que el proceso envejecido no es desalojado en cadena. La ráfaga real, el Gantt y las métricas no se alteran. Con la traza `workloads/inanicion_srtf.txt` (un proceso de ráfaga 6 frente a ocho de ráfaga 2 que llegan cada 2 ticks), SRTF puro posterga al proceso largo 16 ticks y `set_aging 2` lo atiende en *t* = 8: la espera máxima baja de 16 a 8 ticks, a cambio de que la espera media suba de 1,78 a 3,56. Se mantiene desactivado por defecto porque con N = 1 el Escenario 2 ya no da el Gantt exigido.
+
 **Cambio en caliente.** `set_sched` reemplaza el objeto de política bajo el mutex; el proceso en ejecución inicia una porción nueva y la siguiente decisión ya usa el algoritmo nuevo.
 
 **Métricas.** Para cada proceso finalizado: retorno TAT = instante de fin − llegada; espera WT = ticks en la cola de LISTOS (igual a TAT − ráfaga si nunca se bloqueó); respuesta RT = primer uso de CPU − llegada. `stats` muestra sus promedios sobre los procesos finalizados y el uso de CPU = ticks ocupados / ticks simulados × 100.
@@ -118,17 +120,19 @@ El Hilo CLI separa cada línea en palabras (admite comillas dobles para rutas co
 | `[ERROR DE ARCHIVO]` / `[ERROR DE FORMATO]` | La traza no existe o tiene líneas inválidas (se informan todas con su número de línea y no se carga nada) | `load no_existe.txt` |
 | `[ERROR]` | Comando no reconocido (sugiere el correcto si solo difiere en mayúsculas) | `fork`, `PS` |
 
+`load` acepta la ruta tal como la escribe el enunciado: si `load workload_test.txt` no encuentra el archivo en el directorio actual, lo busca en `workloads/` y lo informa con una línea `[INFO]`. Las rutas explícitas y los errores de archivo no cambian.
+
 Si la entrada estándar no es una terminal, la shell repite cada comando en la salida, de modo que una sesión guionizada produce una transcripción legible. Al llegar al fin de la entrada sin `exit`, el sistema se cierra igual de forma ordenada.
 
 # 7. Pruebas y verificación
 
 | Verificación | Cómo se ejecuta | Resultado |
 |---------------------------------------------|------------------------------|--------------------|
-| 66 pruebas unitarias (PCB, parser, RR, SRTF, Gantt, métricas, Kernel con hilos, CLI, lotes, bloqueo) | `make test` | 66/66 |
-| 5 escenarios contra el ejecutable real (Escenarios 1 y 2, robustez de la CLI, bloqueo y cierre) | `make e2e` | 5/5 |
+| 77 pruebas unitarias (PCB, parser, RR, SRTF —incluidos los ejemplos de Silberschatz, p. 145, y Stallings, fig. 8.5—, envejecimiento, Gantt, métricas, Kernel con hilos, CLI, lotes, bloqueo) | `make test` | 77/77 |
+| 7 escenarios contra el ejecutable real (Escenarios 1 y 2 —también con el `load` literal del enunciado—, robustez de la CLI, bloqueo y cierre, inanición y envejecimiento) | `make e2e` | 7/7 |
 | Condiciones de carrera | `make tsan` (ThreadSanitizer, unitarias + escenarios) | Sin reportes |
 | Fugas de memoria | Valgrind sobre el Escenario 2 completo | 0 bytes en uso al salir |
-| Portabilidad y advertencias | g++ 13 y clang++ con `-Wall -Wextra -Wpedantic -Wshadow`; Makefile y CMake | Sin advertencias |
+| Portabilidad y advertencias | g++ 13 y clang++ con `-Wall -Wextra -Wpedantic -Wshadow`; Makefile y CMake; `make e2e` en Linux y en macOS (bash 3.2) | Sin advertencias |
 | Integración continua | GitHub Actions en cada pull request hacia `dev` | Compila, prueba, TSan y escenarios |
 
 # 8. Gestión del proyecto
@@ -138,18 +142,20 @@ El repositorio usa la rama `main` para la versión de entrega, la rama `dev` par
 | Responsable | Issues |
 |------------------|---------------------------------------------------------------------------|
 | Roberto Ferrer | Estructura y compilación con CI · Arquitectura concurrente (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37) |
 | Samantha Castro | Parser y validación estricta · Comandos de la CLI · Pruebas de los escenarios · Documentación e informe |
 
 # 9. Referencias bibliográficas
 
-1. Silberschatz, A., Galvin, P. B. y Gagne, G. (2018). *Operating System Concepts* (10.ª ed.). Wiley. Capítulos 3 (procesos), 4 (hilos), 5 (planificación de CPU) y 6–7 (sincronización).
-2. Tanenbaum, A. S. y Bos, H. (2015). *Modern Operating Systems* (4.ª ed.). Pearson. Capítulo 2 (procesos e hilos, planificación).
-3. Stallings, W. (2018). *Operating Systems: Internals and Design Principles* (9.ª ed.). Pearson. Capítulo 9 (planificación de uniprocesador).
+1. Silberschatz, A., Galvin, P. B. y Gagne, G. (2006). *Fundamentos de sistemas operativos* (7.ª ed.). McGraw-Hill. Capítulos 3 a 7 (gestión de procesos: procesos, hebras, planificación de la CPU, sincronización e interbloqueos); §5.3.2–5.3.3, pp. 145–146 (SRTF, prioridades, inanición y envejecimiento).
+2. Tanenbaum, A. S. (2009). *Sistemas operativos modernos* (3.ª ed.). Pearson Educación. Capítulo 2 (procesos e hilos); §2.4 (planificación), p. 154 (menor tiempo restante a continuación).
+3. Stallings, W. (1997). *Sistemas operativos* (2.ª ed.). Prentice Hall. Capítulos 3 (descripción y control de procesos), 4–5 (concurrencia: exclusión mutua, sincronización, interbloqueo e inanición) y 8 (planificación de monoprocesadores; figura 8.5, p. 354; SRT, p. 360).
 4. Arpaci-Dusseau, R. H. y Arpaci-Dusseau, A. C. (2018). *Operating Systems: Three Easy Pieces*. Arpaci-Dusseau Books. Capítulos 7–8 (planificación) y 26–30 (concurrencia, cerrojos y variables de condición).
 5. Butenhof, D. R. (1997). *Programming with POSIX Threads*. Addison-Wesley.
 6. Kerrisk, M. (2010). *The Linux Programming Interface*. No Starch Press. Capítulos 29–33 (hilos POSIX).
 7. IEEE y The Open Group (2018). *IEEE Std 1003.1-2017 (POSIX.1-2017)*: `pthread_create`, `pthread_join`, `pthread_mutex_lock`, `pthread_cond_wait`, `usleep`.
+
+Las referencias 1 a 3 son las ediciones de la bibliografía del curso (aula virtual, módulo 7).
 
 # Anexo A. Declaración del uso de Inteligencia Artificial
 
@@ -163,6 +169,8 @@ El repositorio usa la rama `main` para la versión de entrega, la rama `dev` par
 
 **Validación realizada durante el desarrollo.** Los resultados se contrastaron con cálculos manuales y con las salidas esperadas del enunciado mediante 66 pruebas unitarias deterministas y 5 escenarios ejecutados contra el binario real; se verificó la ausencia de condiciones de carrera con ThreadSanitizer y la ausencia de fugas con Valgrind, y se compiló sin advertencias con g++ y clang++.
 Cada pull request ejecuta esta batería en GitHub Actions.
+
+**Uso en el aporte individual de Mario Sánchez** (issues #30, #32, #35 y #37). La misma herramienta, en modo agente desde Visual Studio Code (Claude Code), con acceso al repositorio local, a GitHub, al enunciado y a la bibliografía del curso. Prompt principal (resumen): analizar el issue asignado a Mario; auditar el repositorio y GitHub frente al enunciado y a la metodología de los libros del módulo 7; e implementar el aporte con el flujo de ramas y pull requests hacia `dev`. La herramienta propuso e implementó el envejecimiento, la traza de inanición, las pruebas y la documentación, y detectó los problemas que dieron origen a #32, #35 y #37. Los commits se registraron con la cuenta de Mario Sánchez; el uso de la herramienta se declara en este anexo. Validación: los dos diagramas de Gantt de la traza se calcularon a mano (tabla tick a tick en el README) y se contrastaron con el simulador; las pruebas reproducen los ejemplos de Silberschatz (p. 145) y de Stallings (figura 8.5); `make test`, `make e2e` y la integración continua (ThreadSanitizer y CMake) quedaron en verde.
 
 **Validación y apropiación por parte del equipo** (completar antes de la entrega):
 
