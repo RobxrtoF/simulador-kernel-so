@@ -42,6 +42,23 @@ PCB Kernel::createProcess(const std::string& name, long burst, int priority) {
     return created;
 }
 
+std::vector<PCB> Kernel::loadProcesses(const std::vector<ProcessSpec>& specs, long& baseTick) {
+    MutexGuard lock(mutex_);
+    baseTick = sim_.clock();
+    std::vector<int> pids;
+    pids.reserve(specs.size());
+    for (const ProcessSpec& spec : specs) {
+        pids.push_back(sim_.addProcess(spec.name, spec.burst, spec.priority, baseTick + spec.arrival).pid);
+    }
+    sim_.admitArrivals();  // los que llegan "ahora" pasan a LISTO de inmediato
+
+    std::vector<PCB> created;
+    created.reserve(pids.size());
+    for (int pid : pids) created.push_back(*sim_.table().find(pid));
+    pthread_cond_signal(&wakeEngine_);
+    return created;
+}
+
 void Kernel::setPolicy(PolicyKind kind, int quantum) {
     MutexGuard lock(mutex_);
     sim_.setPolicy(kind, quantum);

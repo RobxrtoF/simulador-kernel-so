@@ -1,0 +1,10 @@
+# Archivo con errores A PROPÓSITO para demostrar la validación de `load`:
+# el simulador debe reportar cada línea inválida y no cargar ningún proceso.
+# NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME
+Job_OK, 3, 2, 0
+Job_SinLlegada, 4, 1
+Job_Texto, cuatro, 2, 1
+Job_Prioridad, 2, 9, 1
+Job Con Espacios, 2, 2, 2
+Job_Negativo, 2, 2, -1
+Job_Cero, 0, 3, 0
