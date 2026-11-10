@@ -1,0 +1,18 @@
+% Estilo del informe técnico (pandoc + xelatex). Lo usa docs/generar_documentos.sh.
+\usepackage{float}
+\floatplacement{figure}{htbp}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+\AtBeginDocument{\renewcommand{\tablename}{Tabla}}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Simulador de Kernel — Informe Técnico (Fase I)}
+\fancyhead[R]{\small UCAB · Sistemas Operativos}
+\fancyfoot[C]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\small}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\parskip}{4pt}
