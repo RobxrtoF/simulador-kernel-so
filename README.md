@@ -25,8 +25,8 @@ make            # compila ./simulador
 Otros objetivos:
 
 ```bash
-make test       # 66 pruebas unitarias
-make e2e        # 5 escenarios contra el ejecutable real (incluye los del enunciado)
+make test       # 75 pruebas unitarias
+make e2e        # 6 escenarios contra el ejecutable real (incluye los del enunciado)
 make tsan       # todo lo anterior bajo ThreadSanitizer (detecta condiciones de carrera)
 make clean
 ```
@@ -48,6 +48,7 @@ ctest --test-dir build-cmake --output-on-failure
 | `ps` | Tabla con PID, nombre, estado, ráfaga restante y prioridad, más el reloj, la política y la cola de LISTOS. |
 | `pcb <PID>` | Detalle del Process Control Block: llegada, ráfaga inicial y restante, espera, retorno y respuesta. |
 | `set_sched <RR\|SRTF> [quantum]` | Cambia la política de planificación, incluso con el motor en marcha. Para `RR` el quantum es opcional (defecto 2). |
+| `set_aging <ticks>` | Envejecimiento opcional de SRTF contra la inanición: por cada `<ticks>` de espera, la ráfaga efectiva del proceso baja 1. `0` lo desactiva (defecto). Ver [Inanición en SRTF](#inanición-en-srtf-y-envejecimiento-opcional). |
 | `set_speed <ms_por_tick>` | Duración real de cada tick de CPU, entre 50 y 5000 ms (defecto 1000). |
 | `start` / `pause` | Inicia o reanuda / detiene el reloj de CPU. |
 | `block <PID>` / `unblock <PID>` | Lleva un proceso a PAUSADO/BLOQUEADO y lo devuelve a LISTOS. |
@@ -105,7 +106,7 @@ Job_B, 2, 1, 1
 Job_C, 1, 3, 3
 ```
 
-Los tiempos de llegada son **relativos al instante de la carga** (si se carga en t=0, coinciden con los del archivo). En `workloads/` hay tres trazas: la del enunciado, una carga mixta con un periodo ocioso y un archivo con errores a propósito para demostrar la validación.
+Los tiempos de llegada son **relativos al instante de la carga** (si se carga en t=0, coinciden con los del archivo). En `workloads/` hay cuatro trazas: la del enunciado, una carga mixta con un periodo ocioso, una que provoca inanición en SRTF (`inanicion_srtf.txt`, explicada más abajo) y un archivo con errores a propósito para demostrar la validación.
 
 ## Arquitectura
 
@@ -125,6 +126,63 @@ El detalle (estructura modular, modelo de procesos, algoritmos, pruebas y anexo 
 - **Round Robin**: al agotar el quantum, el proceso vuelve al final de la cola, *después* de los que llegaron en ese mismo instante. Si nadie espera, continúa con un quantum nuevo.
 - **SRTF**: ejecuta el proceso con menor ráfaga restante y desaloja de inmediato al actual si llega uno estrictamente menor. Desempates: prioridad (1 es la más alta), llegada y PID.
 - El tiempo de espera cuenta solo los ticks en la cola de LISTOS (no los bloqueados).
+- **Envejecimiento** (opcional, desactivado por defecto): con `set_aging N`, SRTF compara la *ráfaga efectiva* = ráfaga restante − ⌊espera / N⌋ en lugar de la ráfaga restante. La ráfaga real, el Gantt y las métricas no se alteran.
+
+### Inanición en SRTF y envejecimiento (opcional)
+
+SRTF minimiza la espera media, pero un proceso largo puede quedar postergado indefinidamente si siguen llegando procesos cortos: es la **inanición** (Silberschatz, §5.3.3; Stallings: «existiendo el riesgo de inanición para procesos largos»). La traza `workloads/inanicion_srtf.txt` la provoca:
+
+| Proceso | Ráfaga | Prioridad | Llegada |
+|---------|:------:|:---------:|:-------:|
+| Largo | 6 | 3 | 0 |
+| Corto_1 … Corto_8 | 2 | 3 | 0, 2, 4, 6, 8, 10, 12, 14 |
+
+**SRTF puro** (`set_sched SRTF`). Cada vez que la CPU queda libre llega un corto con ráfaga 2, que le gana a Largo (6). Largo solo obtiene la CPU cuando el flujo termina; si no terminara, no se ejecutaría nunca:
+
+```text
+[0-2s: Corto_1] -> [2-4s: Corto_2] -> [4-6s: Corto_3] -> [6-8s: Corto_4] -> [8-10s: Corto_5] -> [10-12s: Corto_6] -> [12-14s: Corto_7] -> [14-16s: Corto_8] -> [16-22s: Largo]
+```
+
+**Con envejecimiento** (`set_aging 2` y luego `set_sched SRTF`). Silberschatz resuelve la inanición con envejecimiento: «aumentar gradualmente la prioridad de los procesos que estén esperando en el sistema durante mucho tiempo». Como SRTF es una planificación por prioridades en la que la prioridad es la ráfaga, el simulador aplica esa idea a la ráfaga con la que compite cada proceso: `ráfaga efectiva = ráfaga restante − ⌊ticks en LISTOS / 2⌋`. Cálculo a mano en los instantes de decisión:
+
+| t | Espera de Largo | Ráfaga efectiva de Largo | Llega | Decisión |
+|:-:|:---------------:|:------------------------:|:-----:|----------|
+| 0 | 0 | 6 − 0 = 6 | Corto_1 (2) | Corto_1 |
+| 2 | 2 | 6 − 1 = 5 | Corto_2 (2) | Corto_2 |
+| 4 | 4 | 6 − 2 = 4 | Corto_3 (2) | Corto_3 |
+| 6 | 6 | 6 − 3 = 3 | Corto_4 (2) | Corto_4 |
+| 8 | 8 | 6 − 4 = **2** | Corto_5 (2) | Empate en 2 e igual prioridad: gana **Largo** por llegada (t=0) |
+
+Desde t=8 Largo ejecuta sus 6 ticks seguidos. Su espera acumulada no se pierde al obtener la CPU, así que su ráfaga efectiva sigue bajando (2, 1, 0, …, −3) más rápido que la de los cortos en espera, y nadie lo desaloja. Después se atienden Corto_5 … Corto_8, el más envejecido primero, y cada uno espera 6 ticks:
+
+```text
+[0-2s: Corto_1] -> [2-4s: Corto_2] -> [4-6s: Corto_3] -> [6-8s: Corto_4] -> [8-14s: Largo] -> [14-16s: Corto_5] -> [16-18s: Corto_6] -> [18-20s: Corto_7] -> [20-22s: Corto_8]
+```
+
+| Métrica | SRTF puro | SRTF + `set_aging 2` |
+|---------|:---------:|:--------------------:|
+| Espera (y respuesta) de Largo | 16 | 8 |
+| Tiempo promedio de espera | 1,78 | 3,56 |
+| Tiempo promedio de retorno | 4,22 | 6,00 |
+| Uso de CPU | 100 % | 100 % |
+
+El envejecimiento cambia optimalidad por equidad. SRTF puro da la menor espera media, pero no acota la espera de un proceso largo. Con envejecimiento esa espera queda acotada aunque los cortos no dejen de llegar: aquí N·(ráfaga de Largo − ráfaga de un corto) = 2·(6 − 2) = 8 ticks. Va **desactivado por defecto** porque es otra política: con `set_aging 1`, el Escenario 2 ya no da el Gantt exacto del enunciado (en t=3, Job_A empata con Job_C y gana por prioridad).
+
+Para reproducirlo, abra el simulador y escriba:
+
+```text
+> set_sched SRTF
+> load workloads/inanicion_srtf.txt
+> start
+> gantt
+> stats
+```
+
+Para comparar, cierre con `exit`, vuelva a abrirlo y repita los mismos comandos empezando por `set_aging 2`.
+
+Lo verifican `tests/test_srtf.cpp` (SRTF puro, más los ejemplos de Silberschatz, p. 145, y de la figura 8.5 de Stallings, p. 354), `tests/test_envejecimiento.cpp` y `tests/e2e/escenario_6_inanicion_srtf.sh`.
+
+Bibliografía del curso: Silberschatz, Galvin y Gagne, *Fundamentos de Sistemas Operativos*, 7.ª ed., McGraw-Hill, §5.3.2–5.3.3, pp. 145–146 · Stallings, *Sistemas Operativos*, 2.ª ed., Prentice Hall, pp. 350 (prioridades e inanición), 360 (SRT) y 362 (HRRN: el envejecimiento hace que los largos «pasen finalmente primero») · Tanenbaum, *Sistemas Operativos Modernos*, 3.ª ed., Pearson, §2.4.2, p. 154 (SRTN).
 
 ## Estructura del repositorio
 
