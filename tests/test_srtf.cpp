@@ -2,8 +2,11 @@
  * @file test_srtf.cpp
  * @brief Pruebas deterministas de SRTF apropiativo y del cambio de política en caliente.
  */
+#include <cmath>
 #include <string>
 
+#include "batch_loader.hpp"
+#include "gantt.hpp"
 #include "simulation.hpp"
 #include "test_framework.hpp"
 
@@ -12,6 +15,24 @@ using namespace sim;
 namespace {
 void runToCompletion(Simulation& sim, int maxTicks = 1000) {
     while (sim.hasUnfinishedWork() && maxTicks-- > 0) sim.step();
+}
+
+/// Segunda línea de `gantt` (la secuencia de tramos), sin la cabecera.
+std::string ganttLine(const Simulation& sim) {
+    const std::string text = renderGantt(sim.gantt().segments(), sim.clock(), false);
+    const std::size_t start = text.find('\n') + 1;
+    return text.substr(start, text.size() - start - 1);
+}
+
+bool near(double actual, double expected) { return std::fabs(actual - expected) < 1e-9; }
+
+/// Carga en la simulación una traza de workloads/ (las pruebas corren desde la raíz).
+bool loadWorkload(Simulation& sim, const std::string& path) {
+    const LoadResult trace = parseWorkloadFile(path);
+    if (!trace.ok()) return false;
+    for (const ProcessSpec& spec : trace.processes) sim.addProcess(spec.name, spec.burst, spec.priority, spec.arrival);
+    sim.admitArrivals();
+    return true;
 }
 
 /// Carga la traza del Escenario 2 del enunciado.
@@ -133,4 +154,76 @@ TEST_CASE("SRTF: un proceso desalojado antes de ejecutar su primer tick no regis
     CHECK_EQ(b->finishTime, 8L);
     CHECK_EQ(b->responseTime(), 3L);
     CHECK_EQ(b->waitingTime, 3L);
+}
+
+// ----------------------------------------------------------------------------
+// Ejemplos de la bibliografía del curso: el simulador reproduce sus Gantt.
+// ----------------------------------------------------------------------------
+
+TEST_CASE("SRTF reproduce el ejemplo de Silberschatz (7.ª ed., sec. 5.3.2, p. 145)") {
+    // P1..P4 llegan en 0, 1, 2, 3 con ráfagas 8, 4, 9, 5. Espera media: 26 / 4 = 6,5.
+    Simulation sim;
+    sim.setPolicy(PolicyKind::SRTF);
+    sim.addProcess("P1", 8, 3, 0);
+    sim.addProcess("P2", 4, 3, 1);
+    sim.addProcess("P3", 9, 3, 2);
+    sim.addProcess("P4", 5, 3, 3);
+    sim.admitArrivals();
+    runToCompletion(sim);
+    CHECK_EQ(ganttLine(sim), "[0-1s: P1] -> [1-5s: P2] -> [5-10s: P4] -> [10-17s: P1] -> [17-26s: P3]");
+    CHECK_EQ(sim.table().find(1)->waitingTime, 9L);   // 10 - 1
+    CHECK_EQ(sim.table().find(2)->waitingTime, 0L);   // 1 - 1
+    CHECK_EQ(sim.table().find(3)->waitingTime, 15L);  // 17 - 2
+    CHECK_EQ(sim.table().find(4)->waitingTime, 2L);   // 5 - 3
+    CHECK(near(sim.stats().avgWaiting, 6.5));
+}
+
+TEST_CASE("SRTF reproduce la figura 8.5 de Stallings (2.ª ed., «Menor tiempo restante», p. 354)") {
+    // Procesos 1..5: llegadas 0, 2, 4, 6, 8 y servicios 3, 6, 4, 5, 2.
+    // En t=10 empatan 2 y 4 (5 restantes): gana el que llegó antes.
+    Simulation sim;
+    sim.setPolicy(PolicyKind::SRTF);
+    sim.addProcess("P1", 3, 3, 0);
+    sim.addProcess("P2", 6, 3, 2);
+    sim.addProcess("P3", 4, 3, 4);
+    sim.addProcess("P4", 5, 3, 6);
+    sim.addProcess("P5", 2, 3, 8);
+    sim.admitArrivals();
+    runToCompletion(sim);
+    CHECK_EQ(ganttLine(sim), "[0-3s: P1] -> [3-4s: P2] -> [4-8s: P3] -> [8-10s: P5] -> [10-15s: P2] -> [15-20s: P4]");
+    CHECK(near(sim.stats().avgTurnaround, 36.0 / 5.0));  // retornos 3, 13, 4, 14, 2
+}
+
+// ----------------------------------------------------------------------------
+// Inanición: workloads/inanicion_srtf.txt (cálculo a mano en el README).
+// ----------------------------------------------------------------------------
+
+TEST_CASE("Inanición en SRTF: Largo espera mientras sigan llegando procesos cortos") {
+    Simulation sim;
+    sim.setPolicy(PolicyKind::SRTF);
+    CHECK(loadWorkload(sim, "workloads/inanicion_srtf.txt"));
+    CHECK_EQ(sim.table().size(), static_cast<std::size_t>(9));
+
+    // En cada llegada, el corto (2) le gana a Largo (6): Largo no ejecuta hasta t=16.
+    for (int t = 0; t < 15; ++t) sim.step();
+    const PCB* largo = sim.table().find(1);
+    CHECK(!largo->hasStarted());     // t=15: Corto_8 todavía ejecuta
+    sim.step();
+    CHECK_EQ(sim.runningPid(), 1);   // t=16: ya no quedan cortos
+    CHECK_EQ(largo->startTime, 16L);
+    CHECK_EQ(largo->waitingTime, 16L);
+
+    runToCompletion(sim);
+    CHECK_EQ(ganttLine(sim),
+             "[0-2s: Corto_1] -> [2-4s: Corto_2] -> [4-6s: Corto_3] -> [6-8s: Corto_4] -> "
+             "[8-10s: Corto_5] -> [10-12s: Corto_6] -> [12-14s: Corto_7] -> [14-16s: Corto_8] -> "
+             "[16-22s: Largo]");
+    CHECK_EQ(largo->responseTime(), 16L);
+    CHECK_EQ(largo->turnaroundTime(), 22L);
+    for (int pid = 2; pid <= 9; ++pid) CHECK_EQ(sim.table().find(pid)->waitingTime, 0L);
+
+    const SystemStats stats = sim.stats();
+    CHECK(near(stats.avgWaiting, 16.0 / 9.0));    // 1,78: solo espera Largo
+    CHECK(near(stats.avgTurnaround, 38.0 / 9.0)); // (22 + 8 x 2) / 9 = 4,22
+    CHECK_EQ(stats.busyTicks, 22L);
 }

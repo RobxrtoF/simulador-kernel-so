@@ -45,4 +45,5 @@ target_link_libraries(run_tests PRIVATE Threads::Threads)
 if(SIM_SOURCES)
   target_link_libraries(run_tests PRIVATE simcore)
 endif()
-add_test(NAME pruebas_unitarias COMMAND run_tests)
+# Desde la raíz del repositorio, como `make test`: algunas pruebas leen workloads/.
+add_test(NAME pruebas_unitarias COMMAND run_tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
