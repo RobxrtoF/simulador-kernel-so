@@ -1,0 +1,28 @@
+# Integración continua: compila y prueba cada pull request hacia dev/main.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Compilar y probar (g++ C++17 + pthreads)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar con Makefile
+        run: make -j"$(nproc)"
+
+      - name: Pruebas unitarias
+        run: make test
+
+      - name: Compilar y probar con CMake
+        run: |
+          cmake -S . -B build-cmake
+          cmake --build build-cmake -j"$(nproc)"
+          ctest --test-dir build-cmake --output-on-failure
