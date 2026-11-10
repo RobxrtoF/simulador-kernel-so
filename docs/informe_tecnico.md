@@ -2,7 +2,7 @@
 title: "Simulador de Kernel y Gestor de Procesos en Consola"
 subtitle: "Shell & Scheduling Engine — Informe Técnico de Arquitectura (Fase I)"
 author:
-  - "Integrantes: Mario Sanches · Roberto Ferrer · Samantha Castro"
+  - "Integrantes: Mario Sánchez · Roberto Ferrer · Samantha Castro"
   - "Cátedra Sistemas Operativos — Prof. Marcel J. Castro G."
 date: "Universidad Católica Andrés Bello · Facultad de Ingeniería · Escuela de Ingeniería Informática — Noviembre de 2026"
 lang: es
@@ -138,7 +138,7 @@ El repositorio usa la rama `main` para la versión de entrega, la rama `dev` par
 | Responsable | Issues |
 |------------------|---------------------------------------------------------------------------|
 | Roberto Ferrer | Estructura y compilación con CI · Arquitectura concurrente (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sanches | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes |
 | Samantha Castro | Parser y validación estricta · Comandos de la CLI · Pruebas de los escenarios · Documentación e informe |
 
 # 9. Referencias bibliográficas

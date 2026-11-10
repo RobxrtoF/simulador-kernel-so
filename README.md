@@ -148,7 +148,7 @@ Makefile, CMakeLists.txt, .github/workflows/ci.yml
 | Integrante | Módulos (issues asignados) |
 |------------|----------------------------|
 | Roberto Ferrer | Estructura y compilación · Concurrencia (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sanches | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes |
 | Samantha Castro | Parser y validación · Comandos de la CLI · Pruebas de escenarios · Documentación |
 
 ## Uso de Inteligencia Artificial
