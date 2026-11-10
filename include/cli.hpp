@@ -75,6 +75,7 @@ private:
 
     // Un método por comando (los parámetros ya tienen la cantidad correcta).
     void cmdCreate(const Args& args);
+    void cmdLoad(const Args& args);
     void cmdPs(const Args& args);
     void cmdPcb(const Args& args);
     void cmdSetSched(const Args& args);

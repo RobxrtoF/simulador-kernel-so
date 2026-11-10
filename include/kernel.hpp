@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "batch_loader.hpp"
 #include "gantt.hpp"
 #include "metrics.hpp"
 #include "pcb.hpp"
@@ -61,6 +62,13 @@ public:
 
     /// Crea un proceso que llega en el instante actual (NUEVO -> LISTO). Devuelve una copia del PCB.
     PCB createProcess(const std::string& name, long burst, int priority);
+    /**
+     * @brief Inserta en bloque los procesos de un archivo de traza.
+     *
+     * Las llegadas son relativas al instante de la carga: un proceso con
+     * ARRIVAL_TIME = a llega en baseTick + a. Devuelve copias de los PCB creados.
+     */
+    std::vector<PCB> loadProcesses(const std::vector<ProcessSpec>& specs, long& baseTick);
     /// Cambia la política de planificación en caliente.
     void setPolicy(PolicyKind kind, int quantum);
     /// Cambia la duración real de cada tick (la CLI valida el rango 50-5000 ms).

@@ -6,6 +6,8 @@
  *   [ERROR DE SINTAXIS]   cantidad de parámetros incorrecta o comillas sin cerrar
  *   [ERROR DE TIPO]       se esperaba un número entero y se recibió otra cosa
  *   [ERROR DE PARAMETRO]  valor fuera de rango, algoritmo desconocido, PID inexistente
+ *   [ERROR DE ARCHIVO]    el archivo de `load` no existe o no se puede leer
+ *   [ERROR DE FORMATO]    el archivo de `load` tiene líneas mal formadas
  *   [ERROR]               comando no reconocido o error inesperado
  * Ningún error termina el programa: se informa y se solicita la siguiente entrada.
  */
@@ -19,6 +21,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "batch_loader.hpp"
 #include "gantt.hpp"
 #include "metrics.hpp"
 #include "parser.hpp"
@@ -61,6 +64,8 @@ const std::vector<Cli::Command>& Cli::commands() {
     static const std::vector<Command> table = {
         {"create", 2, 3, "create <nombre> <burst_time> [prioridad]",
          "Crea un proceso (prioridad 1-5, defecto 3) y lo ingresa a LISTOS.", &Cli::cmdCreate},
+        {"load", 1, 1, "load <archivo>",
+         "Carga por lotes una traza: NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME.", &Cli::cmdLoad},
         {"ps", 0, 0, "ps", "Tabla con el estado actual de todos los procesos.", &Cli::cmdPs},
         {"pcb", 1, 1, "pcb <PID>", "Detalle del Process Control Block de un proceso.", &Cli::cmdPcb},
         {"set_sched", 1, 2, "set_sched <RR|SRTF> [quantum]",
@@ -223,6 +228,38 @@ void Cli::cmdCreate(const Args& args) {
          << stateName(pcb.state) << ".\n";
 }
 
+void Cli::cmdLoad(const Args& args) {
+    const std::string& path = args[0];
+    const LoadResult result = parseWorkloadFile(path);
+
+    if (!result.fileOpened) {
+        out_ << "[ERROR DE ARCHIVO]: " << result.errors.front() << '\n';
+        return;
+    }
+    if (!result.ok()) {
+        out_ << "[ERROR DE FORMATO]: El archivo '" << path << "' tiene " << result.errors.size()
+             << " error(es); no se cargó ningún proceso:\n";
+        const std::size_t shown = std::min<std::size_t>(result.errors.size(), 10);
+        for (std::size_t i = 0; i < shown; ++i) out_ << "  - " << result.errors[i] << '\n';
+        if (result.errors.size() > shown) out_ << "  ... y " << (result.errors.size() - shown) << " más.\n";
+        out_ << "Formato esperado por línea: NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME\n";
+        return;
+    }
+
+    long baseTick = 0;
+    const std::vector<PCB> created = kernel_.loadProcesses(result.processes, baseTick);
+    std::size_t nameWidth = 0;
+    for (const PCB& pcb : created) nameWidth = std::max(nameWidth, displayWidth(pcb.name));
+
+    out_ << "[OK]: " << created.size() << " proceso(s) cargado(s) desde '" << path
+         << "' (llegadas relativas a t=" << baseTick << "):\n";
+    for (const PCB& pcb : created) {
+        out_ << "  PID " << padRight(std::to_string(pcb.pid), 3) << ' ' << padRight(pcb.name, nameWidth)
+             << "  ráfaga=" << pcb.burstTotal << "  prioridad=" << pcb.priority << "  llegada=t"
+             << pcb.arrivalTime << "  -> " << stateName(pcb.state) << '\n';
+    }
+}
+
 void Cli::cmdPs(const Args&) { out_ << renderProcessTable(kernel_.snapshot()); }
 
 void Cli::cmdPcb(const Args& args) {
@@ -326,6 +363,8 @@ void Cli::cmdHelp(const Args&) {
     out_ << "Notas:\n"
          << "  - El tiempo se mide en ticks del reloj simulado (no en tiempo real).\n"
          << "  - Prioridad: 1 = más alta, 5 = más baja.\n"
+         << "  - Archivo de traza: una línea por proceso, campos separados por coma;\n"
+         << "    las líneas que empiezan con # son comentarios.\n"
          << "  - Errores de sintaxis o de tipo no detienen la simulación.\n";
 }
 
