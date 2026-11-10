@@ -100,5 +100,5 @@ TEST_CASE("CLI: comandos block y unblock") {
     CHECK(contains(out.str(), "[OK]: Proceso PID 1 desbloqueado"));
     out.str("");
     cli.execute("ps");
-    CHECK(contains(out.str(), "1       P1              READY"));
+    CHECK(contains(out.str(), "1      P1             READY"));
 }

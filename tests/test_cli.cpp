@@ -137,9 +137,11 @@ TEST_CASE("CLI: formato de ps y pcb antes de iniciar el motor") {
     shell.run("create Proceso_A 5 2");
     shell.run("create Proceso_B 3 1");
     const std::string ps = shell.run("ps");
-    CHECK(contains(ps, "PID     NOMBRE          ESTADO        BURST RESTANTE    PRIORIDAD\n"));
-    CHECK(contains(ps, "1       Proceso_A       READY         5s                2\n"));
-    CHECK(contains(ps, "2       Proceso_B       READY         3s                1\n"));
+    // Líneas exactas del formato de la sección 5 del enunciado (62 columnas).
+    CHECK(contains(ps, "PID    NOMBRE         ESTADO       BURST RESTANTE    PRIORIDAD\n"
+                       "--------------------------------------------------------------\n"));
+    CHECK(contains(ps, "1      Proceso_A      READY        5s                2\n"));
+    CHECK(contains(ps, "2      Proceso_B      READY        3s                1\n"));
     CHECK(contains(ps, "Cola de LISTOS: Proceso_A -> Proceso_B"));
     CHECK(contains(ps, "Motor: EN PAUSA"));
     CHECK_EQ(shell.run("pcb 1"),
@@ -156,6 +158,16 @@ TEST_CASE("CLI: formato de ps y pcb antes de iniciar el motor") {
              "Tiempo de Retorno  : N/A (En cola de listos)\n"
              "Tiempo de Respuesta: N/A (Aún no ha usado la CPU)\n"
              "==================================================\n");
+}
+
+TEST_CASE("CLI: en ps la columna NOMBRE crece con nombres largos sin perder la alineación") {
+    TestShell shell;
+    shell.run("create Compilador_Principal 4 1");  // 20 caracteres: la columna pasa de 15 a 22
+    shell.run("create P2 2");
+    const std::string ps = shell.run("ps");
+    CHECK(contains(ps, "PID    NOMBRE                ESTADO       BURST RESTANTE    PRIORIDAD\n"));
+    CHECK(contains(ps, "1      Compilador_Principal  READY        4s                1\n"));
+    CHECK(contains(ps, "2      P2                    READY        2s                3\n"));
 }
 
 TEST_CASE("CLI: start, pause y exit") {
