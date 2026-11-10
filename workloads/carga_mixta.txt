@@ -1,0 +1,8 @@
+# Carga de demostración: llegadas escalonadas, prioridades distintas
+# y un periodo ocioso (Respaldo llega cuando la CPU ya está libre).
+# NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME
+Editor, 6, 2, 0
+Compilador, 3, 1, 2
+Navegador, 4, 3, 4
+Reproductor, 2, 4, 5
+Respaldo, 2, 5, 20
