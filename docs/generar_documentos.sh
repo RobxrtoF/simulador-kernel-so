@@ -18,7 +18,7 @@ done
 # El anexo empieza en una página nueva (solo en el PDF; el Markdown queda limpio para GitHub).
 temporal=$(mktemp --suffix=.md)
 trap 'rm -f "$temporal"' EXIT
-sed 's/^# Anexo A\./\\newpage\n\n# Anexo A./' informe_tecnico.md >"$temporal"
+sed 's/^# Anexo \([A-Z]\)\./\\newpage\n\n# Anexo \1./' informe_tecnico.md >"$temporal"
 
 pandoc "$temporal" -o informe_tecnico.pdf \
     --pdf-engine=xelatex --resource-path=. -H estilo_informe.tex \
