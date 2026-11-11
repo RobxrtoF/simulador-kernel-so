@@ -30,7 +30,8 @@ El proyecto separa la **lógica de planificación** (determinista, sin hilos) de
 | `engine` | Función del Hilo Motor (`engineThreadMain`) | Concurrencia |
 | `cli` / `report` | Hilo CLI: tabla de comandos, validación estricta, mensajes de error; formato de `ps` y `pcb` | Interfaz |
 | `parser` / `batch_loader` | Tokenizador, enteros estrictos, nombres; lectura y validación de trazas | Utilidades |
-| `main.cpp` | Crea el `Kernel` y los dos hilos; cierre ordenado y liberación de memoria | Arranque |
+| `gui` / `gui_model` | Bonus: ventana en tiempo real con raylib (dibujo) y cálculos de la vista sin dependencias gráficas (probados) | Interfaz |
+| `main.cpp` | Crea el `Kernel` y los dos hilos; atiende la ventana gráfica; cierre ordenado y liberación de memoria | Arranque |
 
 ![Dependencias entre módulos: la interfaz y el motor solo acceden al estado a través del Kernel.](img/modulos.png){width=55%}
 
@@ -46,9 +47,13 @@ La clase `Simulation` no usa hilos ni temporizadores: avanza exactamente un tick
 
 **Variable de condición.** Cuando el reloj está en pausa o no quedan procesos sin terminar, el motor espera en `pthread_cond_wait`, que libera el mutex mientras duerme. La espera está dentro de un `while` que vuelve a comprobar la condición, lo que cubre los despertares espurios. La CLI despierta al motor con `pthread_cond_signal` en `start`, `create`, `load` y `unblock`, y con `pthread_cond_broadcast` en `exit`.
 
-**Retardo real fuera de la sección crítica.** Cada tick se ejecuta completo con el mutex tomado (`runNextTick` → `step`), lo que dura microsegundos. El retardo de `set_speed` se hace después y **sin** el mutex, con `usleep` en tramos de 10 ms; entre tramos se consultan las banderas, de modo que `pause`, `exit` y los cambios de velocidad surten efecto en menos de 10 ms aunque el tick dure 5000 ms. Así la CLI nunca queda bloqueada por el motor.
+**Retardo real fuera de la sección crítica.** Cada tick se ejecuta completo con el mutex tomado (`runNextTick` → `step`), lo que dura microsegundos. El retardo de `set_speed` se hace después y **sin** el mutex, con `usleep` en tramos de 10 ms; entre tramos se consultan las banderas, de modo que `pause`, `exit` y los cambios de velocidad surten efecto en menos de 10 ms aunque el tick dure 5000 ms. La duración del tick se mide con un reloj monótono, no sumando los tramos pedidos, así que dura lo configurado aunque el sistema alargue cada `usleep`. Así la CLI nunca queda bloqueada por el motor.
 
 **Consultas por copia.** `ps`, `pcb`, `gantt` y `stats` obtienen una copia consistente del estado (`SystemSnapshot`) en una sola sección crítica y le dan formato fuera de ella. Solo el Hilo CLI escribe en la consola, por lo que las salidas no se mezclan.
+
+**Ventana gráfica (bonus).** El comando `gui` abre una ventana hecha con raylib que muestra en tiempo real la tabla de procesos, la CPU, las colas, las métricas y el diagrama de Gantt, y permite iniciar o pausar el reloj y cambiar la política, el quantum, el envejecimiento y la velocidad. La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join` (en macOS es obligatorio crearla y atenderla allí). El Hilo CLI no la abre: la pide con `Kernel::requestGui()`, que hace `pthread_cond_signal` sobre una segunda variable de condición; el hilo principal dormía en `pthread_cond_wait` (`waitForGuiRequest`) y despierta para abrirla, igual que con `exit`. En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, bajo el mutex, y dibuja esa copia; sus botones llaman a los mismos métodos que la CLI. No hay estado compartido nuevo fuera del `Kernel`. La interfaz es opcional (`make gui` o `cmake -DSIM_GUI=ON`): sin ella el proyecto no depende de raylib.
+
+![Interfaz gráfica del comando `gui` (bonus): Round Robin con quantum 2 a mitad de la ejecución.](img/gui_round_robin.png){width=88%}
 
 La ausencia de condiciones de carrera se verificó con **ThreadSanitizer** (`make tsan`), que ejecuta las pruebas unitarias —incluida una prueba de estrés con consultas, creaciones y cambios de política concurrentes— y los escenarios completos sin reportar ningún acceso conflictivo.
 
@@ -128,12 +133,13 @@ Si la entrada estándar no es una terminal, la shell repite cada comando en la s
 
 | Verificación | Cómo se ejecuta | Resultado |
 |---------------------------------------------|------------------------------|--------------------|
-| 77 pruebas unitarias (PCB, parser, RR, SRTF —incluidos los ejemplos de Silberschatz, p. 145, y Stallings, fig. 8.5—, envejecimiento, Gantt, métricas, Kernel con hilos, CLI, lotes, bloqueo) | `make test` | 77/77 |
+| 89 pruebas unitarias (PCB, parser, RR, SRTF —incluidos los ejemplos de Silberschatz, p. 145, y Stallings, fig. 8.5—, envejecimiento, Gantt, métricas, Kernel con hilos, CLI, lotes, bloqueo, vista de la interfaz gráfica y su coordinación entre hilos) | `make test` | 89/89 |
 | 7 escenarios contra el ejecutable real (Escenarios 1 y 2 —también con el `load` literal del enunciado—, robustez de la CLI, bloqueo y cierre, inanición y envejecimiento) | `make e2e` | 7/7 |
 | Condiciones de carrera | `make tsan` (ThreadSanitizer, unitarias + escenarios) | Sin reportes |
 | Fugas de memoria | Valgrind sobre el Escenario 2 completo | 0 bytes en uso al salir |
 | Portabilidad y advertencias | g++ 13 y clang++ con `-Wall -Wextra -Wpedantic -Wshadow`; Makefile y CMake; `make e2e` en Linux y en macOS (bash 3.2) | Sin advertencias |
-| Integración continua | GitHub Actions en cada pull request hacia `dev` | Compila, prueba, TSan y escenarios |
+| Interfaz gráfica (bonus) | `make gui-check`: abre la ventana real, guarda una captura y cierra con `exit`; en la CI, sobre Linux con una pantalla virtual | Ventana, captura y cierre correctos |
+| Integración continua | GitHub Actions en cada pull request hacia `dev` | Compila, prueba, TSan, escenarios e interfaz gráfica |
 
 # 8. Gestión del proyecto
 
@@ -142,7 +148,7 @@ El repositorio usa la rama `main` para la versión de entrega, la rama `dev` par
 | Responsable | Issues |
 |------------------|---------------------------------------------------------------------------|
 | Roberto Ferrer | Estructura y compilación con CI · Arquitectura concurrente (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37) |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo y cambio en caliente · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37), interfaz gráfica (bonus, #14) |
 | Samantha Castro | Parser y validación estricta · Comandos de la CLI · Pruebas de los escenarios · Documentación e informe |
 
 # 9. Referencias bibliográficas
@@ -170,7 +176,7 @@ Las referencias 1 a 3 son las ediciones de la bibliografía del curso (aula virt
 **Validación realizada durante el desarrollo.** Los resultados se contrastaron con cálculos manuales y con las salidas esperadas del enunciado mediante 66 pruebas unitarias deterministas y 5 escenarios ejecutados contra el binario real; se verificó la ausencia de condiciones de carrera con ThreadSanitizer y la ausencia de fugas con Valgrind, y se compiló sin advertencias con g++ y clang++.
 Cada pull request ejecuta esta batería en GitHub Actions.
 
-**Uso en el aporte individual de Mario Sánchez** (issues #30, #32, #35 y #37). La misma herramienta, en modo agente desde Visual Studio Code (Claude Code), con acceso al repositorio local, a GitHub, al enunciado y a la bibliografía del curso. Prompt principal (resumen): analizar el issue asignado a Mario; auditar el repositorio y GitHub frente al enunciado y a la metodología de los libros del módulo 7; e implementar el aporte con el flujo de ramas y pull requests hacia `dev`. La herramienta propuso e implementó el envejecimiento, la traza de inanición, las pruebas y la documentación, y detectó los problemas que dieron origen a #32, #35 y #37. Los commits se registraron con la cuenta de Mario Sánchez; el uso de la herramienta se declara en este anexo. Validación: los dos diagramas de Gantt de la traza se calcularon a mano (tabla tick a tick en el README) y se contrastaron con el simulador; las pruebas reproducen los ejemplos de Silberschatz (p. 145) y de Stallings (figura 8.5); `make test`, `make e2e` y la integración continua (ThreadSanitizer y CMake) quedaron en verde.
+**Uso en el aporte individual de Mario Sánchez** (issues #30, #32, #35, #37 y el bonus #14). La misma herramienta, en modo agente desde Visual Studio Code (Claude Code), con acceso al repositorio local, a GitHub, al enunciado y a la bibliografía del curso. Prompt principal (resumen): analizar el issue asignado a Mario; auditar el repositorio y GitHub frente al enunciado y a la metodología de los libros del módulo 7; e implementar el aporte con el flujo de ramas y pull requests hacia `dev`. La herramienta propuso e implementó el envejecimiento, la traza de inanición, las pruebas y la documentación, y detectó los problemas que dieron origen a #32, #35 y #37. En un segundo prompt se le pidió la interfaz gráfica del bonus: la diseñó e implementó con raylib y la validó con capturas de la ventana real, pruebas unitarias de los cálculos de la vista y una prueba automática de la ventana en macOS y en Linux. Los commits se registraron con la cuenta de Mario Sánchez; el uso de la herramienta se declara en este anexo. Validación: los dos diagramas de Gantt de la traza se calcularon a mano (tabla tick a tick en el README) y se contrastaron con el simulador; las pruebas reproducen los ejemplos de Silberschatz (p. 145) y de Stallings (figura 8.5); `make test`, `make e2e` y la integración continua (ThreadSanitizer y CMake) quedaron en verde.
 
 **Validación y apropiación por parte del equipo** (completar antes de la entrega):
 

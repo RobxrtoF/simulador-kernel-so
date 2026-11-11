@@ -6,6 +6,7 @@ digraph modulos {
 
   main   [label="main.cpp\ncrea hilos", fillcolor="#FFFFFF"];
   cli    [label="cli\nshell, validación", fillcolor="#E3F0FB", color="#2F6EA5"];
+  gui    [label="gui + gui_model\nventana raylib (bonus)", fillcolor="#EFE8FA", color="#6B4FA5"];
   report [label="report\nformato ps / pcb", fillcolor="#E3F0FB", color="#2F6EA5"];
   engine [label="engine\nbucle del motor", fillcolor="#FDF0E1", color="#C27A1B"];
   kernel [label="kernel + sync\nmutex, cond, snapshot", fillcolor="#FBE3E3", color="#B03A3A"];
@@ -17,7 +18,8 @@ digraph modulos {
   batch  [label="batch_loader\ntrazas (load)"];
   parser [label="parser\ntokens, enteros"];
 
-  main -> cli; main -> engine; main -> kernel;
+  main -> cli; main -> engine; main -> kernel; main -> gui;
+  gui -> kernel; cli -> gui;
   cli -> kernel; cli -> report; cli -> parser; cli -> batch;
   report -> kernel;
   engine -> kernel;
