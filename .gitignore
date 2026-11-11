@@ -13,6 +13,11 @@ cmake-build-*/
 # Salidas de las pruebas de escenarios
 tests/e2e/out/
 
+# PDF de referencia (enunciado, bibliografía): no se versionan.
+# El informe técnico sí es un entregable del repositorio.
+*.pdf
+!docs/informe_tecnico.pdf
+
 # Editores y sistema operativo
 .vscode/
 .idea/

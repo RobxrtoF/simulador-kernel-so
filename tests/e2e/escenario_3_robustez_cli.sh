@@ -6,7 +6,10 @@ set -u
 BIN=$1
 source "$(dirname "$0")/lib.sh"
 
-OUTPUT=$(run_session "$BIN" <<'EOF'
+# El guion se lee primero en una variable y se envía con <<<. Si el heredoc
+# estuviera dentro de $(...), el bash 3.2 de macOS intentaría emparejar la
+# comilla de 'load "comillas sin cerrar' y abortaría con un error de sintaxis.
+IFS= read -r -d '' SCRIPT <<'EOF'
 set_speed 50
 create Largo 40 3
 start
@@ -44,7 +47,8 @@ PS
 ps
 exit
 EOF
-)
+
+OUTPUT=$(run_session "$BIN" <<<"$SCRIPT")
 STATUS=$?
 
 echo "Escenario 3: robustez de la CLI con el motor en ejecución"
