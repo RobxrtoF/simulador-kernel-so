@@ -25,8 +25,8 @@ make            # compila ./simulador
 Otros objetivos:
 
 ```bash
-make test       # 75 pruebas unitarias
-make e2e        # 6 escenarios contra el ejecutable real (incluye los del enunciado)
+make test       # 77 pruebas unitarias
+make e2e        # 7 escenarios contra el ejecutable real (incluye los del enunciado)
 make tsan       # todo lo anterior bajo ThreadSanitizer (detecta condiciones de carrera)
 make clean
 ```
@@ -206,7 +206,7 @@ Makefile, CMakeLists.txt, .github/workflows/ci.yml
 | Integrante | Módulos (issues asignados) |
 |------------|----------------------------|
 | Roberto Ferrer | Estructura y compilación · Concurrencia (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37) |
 | Samantha Castro | Parser y validación · Comandos de la CLI · Pruebas de escenarios · Documentación |
 
 ## Uso de Inteligencia Artificial
