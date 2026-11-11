@@ -2,6 +2,7 @@
 /build/
 /build-*/
 /simulador
+.simulador.variante
 *.o
 *.d
 
@@ -10,8 +11,14 @@ CMakeCache.txt
 CMakeFiles/
 cmake-build-*/
 
-# Salidas de las pruebas de escenarios
+# Salidas de las pruebas de escenarios y de la interfaz gráfica
 tests/e2e/out/
+tests/gui/out/
+
+# PDF de referencia (enunciado, bibliografía): no se versionan.
+# El informe técnico sí es un entregable del repositorio.
+*.pdf
+!docs/informe_tecnico.pdf
 
 # Editores y sistema operativo
 .vscode/

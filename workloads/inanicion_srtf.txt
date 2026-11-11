@@ -1,0 +1,21 @@
+# Inanición en SRTF: un proceso largo compite con un flujo continuo de
+# procesos cortos (llega uno cada 2 ticks, justo cuando termina el anterior).
+#
+# - SRTF puro (set_sched SRTF): Largo no obtiene la CPU hasta t=16, cuando
+#   se acaba el flujo; si el flujo no terminara, no se ejecutaría nunca.
+#   Gantt: [0-2s: Corto_1] -> ... -> [14-16s: Corto_8] -> [16-22s: Largo]
+# - Con envejecimiento (set_aging 2, luego set_sched SRTF): la ráfaga
+#   efectiva de Largo baja 1 tick por cada 2 de espera y obtiene la CPU en t=8.
+#   Gantt: [0-2s: Corto_1] -> ... -> [6-8s: Corto_4] -> [8-14s: Largo] -> ...
+#
+# El cálculo a mano de ambos diagramas está en el README.
+# NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME
+Largo, 6, 3, 0
+Corto_1, 2, 3, 0
+Corto_2, 2, 3, 2
+Corto_3, 2, 3, 4
+Corto_4, 2, 3, 6
+Corto_5, 2, 3, 8
+Corto_6, 2, 3, 10
+Corto_7, 2, 3, 12
+Corto_8, 2, 3, 14

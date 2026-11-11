@@ -1,0 +1,29 @@
+// Estructura modular y dependencias. Regenerar con: docs/generar_documentos.sh
+digraph modulos {
+  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.5, bgcolor="white", pad=0.25];
+  node  [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#F4F6F8", color="#5B6770", penwidth=1.2];
+  edge  [color="#7A858C", arrowsize=0.7];
+
+  main   [label="main.cpp\ncrea hilos", fillcolor="#FFFFFF"];
+  cli    [label="cli\nshell, validación", fillcolor="#E3F0FB", color="#2F6EA5"];
+  gui    [label="gui + gui_model\nventana raylib (bonus)", fillcolor="#EFE8FA", color="#6B4FA5"];
+  report [label="report\nformato ps / pcb", fillcolor="#E3F0FB", color="#2F6EA5"];
+  engine [label="engine\nbucle del motor", fillcolor="#FDF0E1", color="#C27A1B"];
+  kernel [label="kernel + sync\nmutex, cond, snapshot", fillcolor="#FBE3E3", color="#B03A3A"];
+  simu   [label="simulation\nreloj, cola LISTOS, step()", fillcolor="#EAF5EA", color="#3C8D40"];
+  policy [label="scheduling_policy\nRound Robin · SRTF", fillcolor="#EAF5EA", color="#3C8D40"];
+  gantt  [label="gantt\nhistorial", fillcolor="#EAF5EA", color="#3C8D40"];
+  metrics[label="metrics\nWT, TAT, RT, CPU", fillcolor="#EAF5EA", color="#3C8D40"];
+  table  [label="process_table + pcb\nPCB y estados", fillcolor="#EAF5EA", color="#3C8D40"];
+  batch  [label="batch_loader\ntrazas (load)"];
+  parser [label="parser\ntokens, enteros"];
+
+  main -> cli; main -> engine; main -> kernel; main -> gui;
+  gui -> kernel; cli -> gui;
+  cli -> kernel; cli -> report; cli -> parser; cli -> batch;
+  report -> kernel;
+  engine -> kernel;
+  kernel -> simu;
+  simu -> policy; simu -> gantt; simu -> metrics; simu -> table;
+  policy -> table; batch -> parser;
+}
