@@ -79,6 +79,7 @@ private:
     void cmdPs(const Args& args);
     void cmdPcb(const Args& args);
     void cmdSetSched(const Args& args);
+    void cmdSetAging(const Args& args);
     void cmdSetSpeed(const Args& args);
     void cmdStart(const Args& args);
     void cmdPause(const Args& args);

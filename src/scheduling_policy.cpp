@@ -58,10 +58,23 @@ void RoundRobinPolicy::decide(SchedContext& ctx) {
 // Shortest Remaining Time First (apropiativo)
 // ----------------------------------------------------------------------------
 
-std::string SrtfPolicy::describe() const { return "SRTF (apropiativo)"; }
+SrtfPolicy::SrtfPolicy(int agingInterval) : agingInterval_(agingInterval > 0 ? agingInterval : kAgingOff) {}
 
-bool SrtfPolicy::goesBefore(const PCB& a, const PCB& b) {
-    if (a.burstRemaining != b.burstRemaining) return a.burstRemaining < b.burstRemaining;
+std::string SrtfPolicy::describe() const {
+    if (agingInterval_ == kAgingOff) return "SRTF (apropiativo)";
+    const std::string every = agingInterval_ == 1 ? "cada tick" : "cada " + std::to_string(agingInterval_) + " ticks";
+    return "SRTF (apropiativo, envejecimiento " + every + ")";
+}
+
+long SrtfPolicy::effectiveRemaining(const PCB& pcb) const {
+    if (agingInterval_ == kAgingOff) return pcb.burstRemaining;
+    return pcb.burstRemaining - pcb.waitingTime / agingInterval_;  // -1 por cada N ticks en LISTOS
+}
+
+bool SrtfPolicy::goesBefore(const PCB& a, const PCB& b) const {
+    const long keyA = effectiveRemaining(a);
+    const long keyB = effectiveRemaining(b);
+    if (keyA != keyB) return keyA < keyB;
     if (a.priority != b.priority) return a.priority < b.priority;
     if (a.arrivalTime != b.arrivalTime) return a.arrivalTime < b.arrivalTime;
     return a.pid < b.pid;
@@ -80,9 +93,11 @@ void SrtfPolicy::decide(SchedContext& ctx) {
 
     const PCB* current = ctx.running();
     if (current != nullptr) {
-        const bool shorter = best->burstRemaining < current->burstRemaining;
-        const bool tieButHigherPriority =
-            best->burstRemaining == current->burstRemaining && best->priority < current->priority;
+        // Sin envejecimiento, la ráfaga efectiva es la restante: SRTF puro.
+        const long bestKey = effectiveRemaining(*best);
+        const long currentKey = effectiveRemaining(*current);
+        const bool shorter = bestKey < currentKey;
+        const bool tieButHigherPriority = bestKey == currentKey && best->priority < current->priority;
         if (!shorter && !tieButHigherPriority) return;  // el actual sigue ejecutando
         preemptRunning(ctx);                            // desalojo inmediato
     }
@@ -93,8 +108,8 @@ void SrtfPolicy::decide(SchedContext& ctx) {
 // Fábrica
 // ----------------------------------------------------------------------------
 
-std::unique_ptr<SchedulingPolicy> makePolicy(PolicyKind kind, int quantum) {
-    if (kind == PolicyKind::SRTF) return std::make_unique<SrtfPolicy>();
+std::unique_ptr<SchedulingPolicy> makePolicy(PolicyKind kind, int quantum, int agingInterval) {
+    if (kind == PolicyKind::SRTF) return std::make_unique<SrtfPolicy>(agingInterval);
     return std::make_unique<RoundRobinPolicy>(quantum);
 }
 

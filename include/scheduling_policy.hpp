@@ -24,6 +24,9 @@ enum class PolicyKind { RoundRobin, SRTF };
 /// Quantum por defecto de Round Robin (ticks).
 constexpr int kDefaultQuantum = 2;
 
+/// Envejecimiento de SRTF desactivado (SRTF puro). Es el valor por defecto.
+constexpr int kAgingOff = 0;
+
 /**
  * @brief Vista del estado que una política necesita para decidir.
  *
@@ -101,18 +104,47 @@ private:
  *   3) llegada más temprana, 4) PID menor.
  * Solo se desaloja al proceso en ejecución si el candidato tiene menos ráfaga
  * restante, o igual ráfaga y mejor prioridad (evita cambios de contexto inútiles).
+ *
+ * Inanición y envejecimiento (opcional, desactivado por defecto):
+ * SRTF es un caso particular de la planificación por prioridades en el que la
+ * "prioridad" es la ráfaga restante (Silberschatz, cap. 5.3.3). Por eso un
+ * proceso largo puede quedar postergado indefinidamente si siguen llegando
+ * procesos cortos (inanición). Con envejecimiento cada N ticks, la política
+ * compara la RÁFAGA EFECTIVA:
+ *
+ *     ráfaga efectiva = ráfaga restante - (ticks esperando en LISTOS / N)
+ *
+ * (división entera). Es la técnica del libro, "aumentar gradualmente la
+ * prioridad de los procesos que estén esperando en el sistema durante mucho
+ * tiempo" (p. 146), aplicada a la clave de SRTF: cada N ticks de espera el
+ * proceso "parece" un tick más corto. Como la
+ * espera acumulada no se pierde al obtener la CPU, el proceso envejecido no es
+ * desalojado en cadena por los cortos que siguen llegando.
+ * La ráfaga restante real, el Gantt y las métricas no se alteran: solo cambia
+ * el orden de selección. Con N = kAgingOff la política es SRTF puro.
  */
 class SrtfPolicy : public SchedulingPolicy {
 public:
+    /// @param agingInterval Ticks de espera por cada tick que se descuenta (kAgingOff = SRTF puro).
+    explicit SrtfPolicy(int agingInterval = kAgingOff);
     PolicyKind kind() const override { return PolicyKind::SRTF; }
     std::string describe() const override;
     void decide(SchedContext& ctx) override;
-    /// true si `a` debe ejecutarse antes que `b` según SRTF y sus desempates.
-    static bool goesBefore(const PCB& a, const PCB& b);
+
+    /// Intervalo de envejecimiento en ticks (kAgingOff si está desactivado).
+    int agingInterval() const { return agingInterval_; }
+    /// Ráfaga con la que compite el proceso: la restante, menos el bono de envejecimiento.
+    long effectiveRemaining(const PCB& pcb) const;
+    /// true si `a` debe ejecutarse antes que `b` según SRTF (ráfaga efectiva) y sus desempates.
+    bool goesBefore(const PCB& a, const PCB& b) const;
+
+private:
+    int agingInterval_;
 };
 
-/// Crea la política indicada (el quantum solo aplica a Round Robin).
-std::unique_ptr<SchedulingPolicy> makePolicy(PolicyKind kind, int quantum = kDefaultQuantum);
+/// Crea la política indicada (el quantum solo aplica a RR y el envejecimiento solo a SRTF).
+std::unique_ptr<SchedulingPolicy> makePolicy(PolicyKind kind, int quantum = kDefaultQuantum,
+                                             int agingInterval = kAgingOff);
 
 }  // namespace sim
 

@@ -41,6 +41,8 @@ struct SystemSnapshot {
     bool engineRunning = false;           ///< true si el reloj de CPU está corriendo.
     int msPerTick = 0;                    ///< Duración real de cada tick.
     std::string policy;                   ///< Descripción de la política activa.
+    PolicyKind policyKind = PolicyKind::RoundRobin;  ///< Algoritmo activo.
+    int agingInterval = kAgingOff;        ///< Envejecimiento de SRTF configurado (ticks).
     int runningPid = kNoPid;              ///< Proceso en EJECUCIÓN.
     bool cpuIdleWithPendingWork = false;  ///< CPU libre con procesos sin terminar.
     std::vector<PCB> processes;           ///< Todos los PCB, ordenados por PID.
@@ -75,6 +77,8 @@ public:
     bool unblockProcess(int pid, std::string& error);
     /// Cambia la política de planificación en caliente.
     void setPolicy(PolicyKind kind, int quantum);
+    /// Activa (ticks > 0) o desactiva (kAgingOff) el envejecimiento de SRTF, en caliente.
+    void setAging(int ticks);
     /// Cambia la duración real de cada tick (la CLI valida el rango 50-5000 ms).
     void setSpeed(int msPerTick);
     /// Inicia o reanuda el reloj de CPU. false si ya estaba en ejecución.
