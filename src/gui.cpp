@@ -471,8 +471,14 @@ private:
             if (i == 1) DrawRectangleRec({cx - 1.0f, cy - 5.0f, 2.0f, 10.0f}, sign);
             if (over && pressed_) delta = i == 0 ? -1 : 1;
         }
-        textCentered(value, rect.x + rect.width / 2.0f, rect.y + rect.height / 2.0f - 8.5f, 14,
-                     enabled ? kText : kFaint, Weight::SemiBold);
+        // Valores enormes puestos por consola (hasta 2147483647): se achica la letra y,
+        // si aun así no cabe entre los botones, se recorta con puntos suspensivos.
+        const float room = rect.width - 2.0f * side - 4.0f;
+        int size = 14;
+        while (size > 10 && textWidth(value, size, Weight::SemiBold) > room) --size;
+        textCentered(fit(value, room, size, Weight::SemiBold), rect.x + rect.width / 2.0f,
+                     rect.y + rect.height / 2.0f - static_cast<float>(size) * 0.6f, size, enabled ? kText : kFaint,
+                     Weight::SemiBold);
         return delta;
     }
 
@@ -606,14 +612,21 @@ private:
         const int quantumDelta =
             stepper({x, centerY - 17.0f, 104.0f, 34.0f}, std::to_string(snap_.quantum), roundRobin);
         if (quantumDelta != 0) {
-            kernel_.setPolicy(PolicyKind::RoundRobin, std::clamp(snap_.quantum + quantumDelta, 1, 99));
+            // En long: el quantum puede venir de la consola con un valor enorme (hasta INT_MAX).
+            const long upper = std::max<long>(99, snap_.quantum);
+            kernel_.setPolicy(PolicyKind::RoundRobin,
+                              static_cast<int>(std::clamp<long>(static_cast<long>(snap_.quantum) + quantumDelta, 1, upper)));
         }
         x += 104.0f + 22.0f;
 
         label("Envejecimiento");
         const std::string agingText = snap_.agingInterval == kAgingOff ? "No" : std::to_string(snap_.agingInterval);
         const int agingDelta = stepper({x, centerY - 17.0f, 104.0f, 34.0f}, agingText, !roundRobin);
-        if (agingDelta != 0) kernel_.setAging(std::clamp(snap_.agingInterval + agingDelta, 0, 99));
+        if (agingDelta != 0) {
+            const long upper = std::max<long>(99, snap_.agingInterval);
+            kernel_.setAging(
+                static_cast<int>(std::clamp<long>(static_cast<long>(snap_.agingInterval) + agingDelta, 0, upper)));
+        }
         x += 104.0f + 22.0f;
 
         label("Velocidad");
@@ -801,10 +814,13 @@ private:
             text(stateLabel, xState + 10.0f, centerY - 6.5f, 11, stateTint, Weight::SemiBold);
 
             const double shown = shownCompletion_.count(pcb.pid) ? shownCompletion_[pcb.pid] : gui::completion(pcb);
+            // Etiqueta «ejecutado/total»; con ráfagas enormes se muestra el porcentaje para no
+            // encimarse con la barra.
+            std::string done = std::to_string(pcb.executedTime()) + "/" + std::to_string(pcb.burstTotal);
+            if (textWidth(done, 12) > 54.0f) done = std::to_string(static_cast<int>(gui::completion(pcb) * 100.0)) + "%";
             progressBar({xProgress, centerY - 4.0f, progressWidth - 62.0f, 8.0f}, shown,
                         finished ? withAlpha(color, 0.55f) : color);
-            textRight(std::to_string(pcb.executedTime()) + "/" + std::to_string(pcb.burstTotal),
-                      xProgress + progressWidth - 16.0f, centerY - 7.5f, 12, kMuted);
+            textRight(done, xProgress + progressWidth - 16.0f, centerY - 7.5f, 12, kMuted);
 
             const std::string numbers[4] = {std::to_string(pcb.burstRemaining), std::to_string(pcb.priority),
                                             std::to_string(pcb.waitingTime), "t=" + std::to_string(pcb.arrivalTime)};
@@ -1267,9 +1283,19 @@ void runGui(Kernel& kernel) {
     SetTargetFPS(60);
 
     {
-        GuiApp app(kernel);  // las fuentes se liberan antes de cerrar la ventana
-        while (!WindowShouldClose() && !kernel.shutdownRequested() && !app.wantsClose()) {
-            app.frame();
+        // Red de seguridad: si algo falla al dibujar, se cierra la ventana pero la
+        // simulación y la consola siguen funcionando.
+        try {
+            GuiApp app(kernel);  // las fuentes se liberan antes de cerrar la ventana
+            while (!WindowShouldClose() && !kernel.shutdownRequested() && !app.wantsClose()) {
+                app.frame();
+            }
+        } catch (const std::exception& error) {
+            std::cout << "\n[ERROR]: La interfaz gráfica se cerró por un error inesperado (" << error.what()
+                      << "). La consola sigue funcionando; puede volver a abrirla con 'gui'.\n" << std::flush;
+        } catch (...) {
+            std::cout << "\n[ERROR]: La interfaz gráfica se cerró por un error inesperado. "
+                         "La consola sigue funcionando; puede volver a abrirla con 'gui'.\n" << std::flush;
         }
     }
     CloseWindow();
