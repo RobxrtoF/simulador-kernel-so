@@ -29,8 +29,8 @@ make            # compila ./simulador
 Otros objetivos:
 
 ```bash
-make test       # 89 pruebas unitarias
-make e2e        # 7 escenarios contra el ejecutable real (incluye los del enunciado)
+make test       # 93 pruebas unitarias
+make e2e        # 8 escenarios contra el ejecutable real (incluye los del enunciado)
 make tsan       # todo lo anterior bajo ThreadSanitizer (detecta condiciones de carrera)
 make gui        # ./simulador con la interfaz gráfica (bonus; requiere raylib, ver más abajo)
 make clean
@@ -60,7 +60,7 @@ ctest --test-dir build-cmake --output-on-failure
 | `gantt` | Diagrama de Gantt acumulado hasta el instante actual. |
 | `stats` | Procesos finalizados, promedios de espera, retorno y respuesta, uso de CPU. |
 | `gui` | Abre la interfaz gráfica en tiempo real (bonus). Requiere compilar con `make gui`; si no, explica cómo hacerlo. La shell sigue activa. |
-| `help` | Manual rápido. |
+| `help` | Manual rápido: la sintaxis de cada comando y un ejemplo listo para copiar en los que llevan parámetros. |
 | `exit` | Detiene los hilos de forma limpia, libera la memoria y sale. |
 
 Errores de sintaxis, de tipo o de rango se informan con el formato del enunciado (`[ERROR DE SINTAXIS]`, `[ERROR DE TIPO]`, `[ERROR DE PARAMETRO]`, …) y la shell solicita la siguiente entrada.
@@ -113,6 +113,19 @@ Job_C, 1, 3, 3
 ```
 
 Los tiempos de llegada son **relativos al instante de la carga** (si se carga en t=0, coinciden con los del archivo). En `workloads/` hay cuatro trazas: la del enunciado, una carga mixta con un periodo ocioso, una que provoca inanición en SRTF (`inanicion_srtf.txt`, explicada más abajo) y un archivo con errores a propósito para demostrar la validación.
+
+### Carga mixta: periodo ocioso y desempate por prioridad
+
+`carga_mixta.txt` combina llegadas escalonadas, prioridades distintas y un periodo ocioso: Respaldo llega en *t* = 20, cuando la CPU ya terminó lo demás. Resultados calculados a mano y comprobados por `tests/e2e/escenario_5_carga_mixta.sh`:
+
+| Política | Diagrama de Gantt | Espera / Retorno / Respuesta (promedios) | Uso de CPU |
+|----------|-------------------|------------------------------------------|------------|
+| RR, quantum 2 | `[0-2s: Editor] -> [2-4s: Compilador] -> [4-6s: Editor] -> [6-8s: Navegador] -> [8-9s: Compilador] -> [9-11s: Reproductor] -> [11-13s: Editor] -> [13-15s: Navegador] -> [15-20s: IDLE] -> [20-22s: Respaldo]` | 4.40 / 7.80 / 1.20 ticks | 77.3 % |
+| SRTF | `[0-2s: Editor] -> [2-5s: Compilador] -> [5-7s: Reproductor] -> [7-11s: Editor] -> [11-15s: Navegador] -> [15-20s: IDLE] -> [20-22s: Respaldo]` | 2.40 / 5.80 / 1.40 ticks | 77.3 % |
+
+- En RR, al agotar su quantum el proceso vuelve a la cola *detrás* de los que llegaron en ese mismo instante: en *t* = 2 Compilador pasa antes que Editor, y en *t* = 4 Navegador antes que Compilador.
+- En SRTF, en *t* = 7 Editor y Navegador empatan con 4 ticks restantes y gana Editor por tener mayor prioridad (2 frente a 3).
+- En ambos casos la CPU queda ociosa entre *t* = 15 y *t* = 20; esos 5 ticks cuentan en el tiempo simulado, por eso el uso de CPU es 17 / 22 = 77.3 %.
 
 ## Interfaz gráfica (bonus)
 
@@ -182,7 +195,7 @@ El detalle (estructura modular, modelo de procesos, algoritmos, pruebas y anexo 
 - **Round Robin**: al agotar el quantum, el proceso vuelve al final de la cola, *después* de los que llegaron en ese mismo instante. Si nadie espera, continúa con un quantum nuevo.
 - **SRTF**: ejecuta el proceso con menor ráfaga restante y desaloja de inmediato al actual si llega uno estrictamente menor. Desempates: prioridad (1 es la más alta), llegada y PID.
 - El tiempo de espera cuenta solo los ticks en la cola de LISTOS (no los bloqueados).
-- **Envejecimiento** (opcional, desactivado por defecto): con `set_aging N`, SRTF compara la *ráfaga efectiva* = ráfaga restante − ⌊espera / N⌋ en lugar de la ráfaga restante. La ráfaga real, el Gantt y las métricas no se alteran.
+- **Envejecimiento** (opcional, desactivado por defecto): con `set_aging N`, SRTF compara la *ráfaga efectiva* = ráfaga restante − ⌊espera / N⌋ en lugar de la ráfaga restante. La ráfaga restante real no se modifica: solo cambia el orden de selección y, con él, el Gantt y las métricas.
 
 ### Inanición en SRTF y envejecimiento (opcional)
 
@@ -256,15 +269,15 @@ Makefile, CMakeLists.txt, .github/workflows/ci.yml
 
 - `main`: versión estable de entrega (solo recibe `dev` cuando el equipo lo aprueba).
 - `dev`: rama de integración; cada módulo llega por pull request desde su rama `feature/*`.
-- Cada pull request cierra su issue, ejecuta la integración continua (compilación, pruebas, ThreadSanitizer y escenarios) y se mueve en el tablero Kanban **Por hacer → Haciendo → Completado**.
+- Cada pull request cierra su issue, ejecuta la integración continua (compilación, pruebas, ThreadSanitizer y escenarios) y se mueve en el tablero Kanban **Por hacer → Haciendo → Hecho**.
 
 ## Equipo y responsables por módulo
 
 | Integrante | Módulos (issues asignados) |
 |------------|----------------------------|
-| Roberto Ferrer | Estructura y compilación · Concurrencia (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
+| Roberto Ferrer | Estructura y compilación · Concurrencia (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos · Aporte individual: casos borde de Round Robin (#29) |
 | Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37), interfaz gráfica (bonus, #14) |
-| Samantha Castro | Parser y validación · Comandos de la CLI · Pruebas de escenarios · Documentación |
+| Samantha Castro | Parser y validación · Comandos de la CLI · Pruebas de escenarios · Documentación · Aporte individual: escenario de carga mixta, ejemplos en `help` y cierre de la documentación (#31) |
 
 ## Uso de Inteligencia Artificial
 
