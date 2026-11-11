@@ -67,6 +67,7 @@ private:
         std::size_t maxArgs;                  ///< Parámetros máximos (obligatorios + opcionales).
         const char* usage;                    ///< Sintaxis mostrada en errores y en help.
         const char* description;              ///< Explicación para help.
+        const char* example;                  ///< Ejemplo de uso para help (nullptr si no lleva parámetros).
         void (Cli::*handler)(const Args&);    ///< Método que ejecuta el comando.
     };
 

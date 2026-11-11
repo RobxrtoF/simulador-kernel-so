@@ -64,28 +64,33 @@ void* cliThreadMain(void* arg) {
 const std::vector<Cli::Command>& Cli::commands() {
     static const std::vector<Command> table = {
         {"create", 2, 3, "create <nombre> <burst_time> [prioridad]",
-         "Crea un proceso (prioridad 1-5, defecto 3) y lo ingresa a LISTOS.", &Cli::cmdCreate},
+         "Crea un proceso (prioridad 1-5, defecto 3) y lo ingresa a LISTOS.", "create P1 5 2", &Cli::cmdCreate},
         {"load", 1, 1, "load <archivo>",
-         "Carga por lotes una traza: NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME.", &Cli::cmdLoad},
-        {"ps", 0, 0, "ps", "Tabla con el estado actual de todos los procesos.", &Cli::cmdPs},
-        {"pcb", 1, 1, "pcb <PID>", "Detalle del Process Control Block de un proceso.", &Cli::cmdPcb},
+         "Carga por lotes una traza: NOMBRE, BURST_TIME, PRIORIDAD, ARRIVAL_TIME.", "load workload_test.txt",
+         &Cli::cmdLoad},
+        {"ps", 0, 0, "ps", "Tabla con el estado actual de todos los procesos.", nullptr, &Cli::cmdPs},
+        {"pcb", 1, 1, "pcb <PID>", "Detalle del Process Control Block de un proceso.", "pcb 1", &Cli::cmdPcb},
         {"set_sched", 1, 2, "set_sched <RR|SRTF> [quantum]",
-         "Cambia la política (RR: quantum > 0, defecto 2). Se puede usar en caliente.", &Cli::cmdSetSched},
+         "Cambia la política (RR: quantum > 0, defecto 2). Se puede usar en caliente.",
+         "set_sched RR 2  o  set_sched SRTF", &Cli::cmdSetSched},
         {"set_aging", 1, 1, "set_aging <ticks>",
-         "Envejecimiento de SRTF contra la inanición (0 = desactivado, defecto).", &Cli::cmdSetAging},
+         "Envejecimiento de SRTF contra la inanición (0 = desactivado, defecto).", "set_aging 2",
+         &Cli::cmdSetAging},
         {"set_speed", 1, 1, "set_speed <ms_por_tick>",
-         "Duración real de cada tick de CPU (50 a 5000 ms; defecto 1000).", &Cli::cmdSetSpeed},
-        {"start", 0, 0, "start", "Inicia o reanuda el reloj de CPU (Hilo Motor).", &Cli::cmdStart},
-        {"pause", 0, 0, "pause", "Pausa el reloj de CPU para inspeccionar el sistema.", &Cli::cmdPause},
-        {"block", 1, 1, "block <PID>", "Bloquea un proceso READY o RUNNING (estado BLOCKED).", &Cli::cmdBlock},
-        {"unblock", 1, 1, "unblock <PID>", "Devuelve un proceso bloqueado a la cola de LISTOS.",
+         "Duración real de cada tick de CPU (50 a 5000 ms; defecto 1000).", "set_speed 500", &Cli::cmdSetSpeed},
+        {"start", 0, 0, "start", "Inicia o reanuda el reloj de CPU (Hilo Motor).", nullptr, &Cli::cmdStart},
+        {"pause", 0, 0, "pause", "Pausa el reloj de CPU para inspeccionar el sistema.", nullptr, &Cli::cmdPause},
+        {"block", 1, 1, "block <PID>", "Bloquea un proceso READY o RUNNING (estado BLOCKED).", "block 1",
+         &Cli::cmdBlock},
+        {"unblock", 1, 1, "unblock <PID>", "Devuelve un proceso bloqueado a la cola de LISTOS.", "unblock 1",
          &Cli::cmdUnblock},
-        {"gantt", 0, 0, "gantt", "Diagrama de Gantt acumulado hasta el instante actual.", &Cli::cmdGantt},
-        {"stats", 0, 0, "stats", "Métricas globales: espera, retorno, respuesta y uso de CPU.",
+        {"gantt", 0, 0, "gantt", "Diagrama de Gantt acumulado hasta el instante actual.", nullptr, &Cli::cmdGantt},
+        {"stats", 0, 0, "stats", "Métricas globales: espera, retorno, respuesta y uso de CPU.", nullptr,
          &Cli::cmdStats},
-        {"gui", 0, 0, "gui", "Abre la interfaz gráfica en tiempo real (bonus; compilar con 'make gui').", &Cli::cmdGui},
-        {"help", 0, 0, "help", "Muestra este manual rápido.", &Cli::cmdHelp},
-        {"exit", 0, 0, "exit", "Detiene los hilos, libera la memoria y cierra la simulación.", &Cli::cmdExit},
+        {"gui", 0, 0, "gui", "Abre la interfaz gráfica en tiempo real (bonus; compilar con 'make gui').", nullptr,
+         &Cli::cmdGui},
+        {"help", 0, 0, "help", "Muestra este manual rápido.", nullptr, &Cli::cmdHelp},
+        {"exit", 0, 0, "exit", "Detiene los hilos, libera la memoria y cierra la simulación.", nullptr, &Cli::cmdExit},
     };
     return table;
 }
@@ -426,6 +431,10 @@ void Cli::cmdHelp(const Args&) {
     out_ << "MANUAL RÁPIDO DE LA CLI\n";
     for (const Command& command : commands()) {
         out_ << "  " << padRight(command.usage, width + 2) << command.description << '\n';
+        // Los comandos con parámetros muestran un ejemplo listo para copiar, alineado con la descripción.
+        if (command.example != nullptr) {
+            out_ << "  " << std::string(width + 2, ' ') << "Ej.: " << command.example << '\n';
+        }
     }
     out_ << "Notas:\n"
          << "  - El tiempo se mide en ticks del reloj simulado (no en tiempo real).\n"

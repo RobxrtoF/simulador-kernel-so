@@ -204,3 +204,46 @@ TEST_CASE("CLI + Hilo Motor: Escenario 1 completo y salida de gantt, stats y pcb
     CHECK(contains(pcb, "Tiempo de Retorno  : 9 ticks\n"));
     CHECK(contains(pcb, "Tiempo de Respuesta: 2 ticks\n"));
 }
+
+TEST_CASE("CLI: help muestra un ejemplo de uso para cada comando con parámetros") {
+    TestShell shell;
+    const std::string help = shell.run("help");
+    const char* const examples[] = {"Ej.: create P1 5 2",
+                                    "Ej.: load workload_test.txt",
+                                    "Ej.: pcb 1",
+                                    "Ej.: set_sched RR 2  o  set_sched SRTF",
+                                    "Ej.: set_aging 2",
+                                    "Ej.: set_speed 500",
+                                    "Ej.: block 1",
+                                    "Ej.: unblock 1"};
+    for (const char* example : examples) CHECK(contains(help, example));
+
+    // Solo los 8 comandos con parámetros llevan ejemplo; ps, start, gantt, etc. no lo necesitan.
+    std::size_t count = 0;
+    for (std::size_t pos = help.find("Ej.: "); pos != std::string::npos; pos = help.find("Ej.: ", pos + 1)) ++count;
+    CHECK_EQ(count, static_cast<std::size_t>(8));
+}
+
+TEST_CASE("CLI: los ejemplos de help se pueden copiar tal cual (sin errores de sintaxis ni de tipo)") {
+    TestShell shell;
+    std::istringstream lines(shell.run("help"));
+    std::string line;
+    std::size_t executed = 0;
+    while (std::getline(lines, line)) {
+        const std::size_t pos = line.find("Ej.: ");
+        if (pos == std::string::npos) continue;
+        std::string rest = line.substr(pos + 5);
+        for (;;) {  // una línea puede traer dos ejemplos separados por «  o  »
+            const std::size_t sep = rest.find("  o  ");
+            const std::string out = shell.run(rest.substr(0, sep));
+            CHECK(!contains(out, "[ERROR DE SINTAXIS]"));
+            CHECK(!contains(out, "[ERROR DE TIPO]"));
+            CHECK(!contains(out, "[ERROR]:"));  // comando no reconocido
+            ++executed;
+            if (sep == std::string::npos) break;
+            rest = rest.substr(sep + 5);
+        }
+    }
+    // Se ejecutan en orden: create P1 5 2 crea el PID 1 que usan pcb, block y unblock.
+    CHECK_EQ(executed, static_cast<std::size_t>(9));
+}
