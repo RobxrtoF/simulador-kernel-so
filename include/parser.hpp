@@ -48,6 +48,21 @@ IntParse parseInteger(const std::string& text, long& value);
 /// Quita espacios, tabuladores, '\r' y '\n' al inicio y al final.
 std::string trim(const std::string& text);
 
+/**
+ * @brief Limpia los caracteres «invisibles» que llegan al copiar y pegar.
+ *
+ * Al copiar comandos o trazas desde un PDF, Word o una página web se cuelan
+ * caracteres Unicode que no se ven pero rompen la validación: el propio
+ * enunciado trae un espacio de ancho cero (U+200B) al final de las líneas de
+ * workload_test.txt. Esta función:
+ *   - elimina los de ancho cero: U+200B, U+200C, U+200D, U+2060 y U+FEFF (BOM);
+ *   - convierte en espacio normal los espacios Unicode: U+00A0 (espacio duro),
+ *     U+2000 a U+200A, U+202F, U+205F y U+3000;
+ *   - convierte las comillas tipográficas “ ” en comillas rectas (").
+ * El resto del texto (letras con tilde, ñ, emojis) no se toca.
+ */
+std::string normalizeInput(const std::string& text);
+
 /// Longitud máxima (en caracteres) del nombre de un proceso.
 constexpr std::size_t kMaxNameLength = 32;
 

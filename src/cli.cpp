@@ -134,7 +134,8 @@ void Cli::run(std::istream& in, bool echoCommands) {
 
 bool Cli::execute(const std::string& line) {
     try {
-        const std::string trimmed = trim(line);
+        // Lo pegado desde un PDF o Word puede traer caracteres invisibles (U+200B...).
+        const std::string trimmed = trim(normalizeInput(line));
         if (trimmed.empty() || trimmed[0] == '#') return true;  // línea vacía o comentario
 
         const TokenizeResult parsed = tokenize(trimmed);
@@ -167,6 +168,8 @@ bool Cli::execute(const std::string& line) {
     } catch (const std::exception& error) {
         // Red de seguridad: la shell nunca debe caerse por una entrada inesperada.
         out_ << "[ERROR]: Error inesperado al ejecutar el comando: " << error.what() << '\n';
+    } catch (...) {
+        out_ << "[ERROR]: Error inesperado al ejecutar el comando.\n";
     }
     return !exitRequested_;
 }

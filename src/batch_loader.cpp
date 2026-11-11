@@ -118,7 +118,8 @@ LoadResult parseWorkload(std::istream& in) {
         ++lineNumber;
         if (lineNumber == 1 && raw.compare(0, 3, "\xEF\xBB\xBF") == 0) raw.erase(0, 3);  // BOM UTF-8
 
-        const std::string line = trim(raw);
+        // Trazas copiadas desde el PDF del enunciado traen U+200B al final de cada línea.
+        const std::string line = trim(normalizeInput(raw));
         if (line.empty() || line[0] == '#') continue;
 
         const std::vector<std::string> fields = splitFields(line);
