@@ -139,11 +139,11 @@ Si la entrada estándar no es una terminal, la shell repite cada comando en la s
 | Fugas de memoria | Valgrind sobre el Escenario 2 completo | 0 bytes en uso al salir |
 | Portabilidad y advertencias | g++ 13 y clang++ con `-Wall -Wextra -Wpedantic -Wshadow`; Makefile y CMake; `make e2e` en Linux y en macOS (bash 3.2) | Sin advertencias |
 | Interfaz gráfica (bonus) | `make gui-check`: abre la ventana real, guarda una captura y cierra con `exit`; en la CI, sobre Linux con una pantalla virtual | Ventana, captura y cierre correctos |
-| Integración continua | GitHub Actions en cada pull request hacia `dev` | Compila, prueba, TSan, escenarios e interfaz gráfica |
+| Integración continua | GitHub Actions en cada pull request y en cada push a `dev` y `main` | Compila, prueba, TSan, escenarios e interfaz gráfica |
 
 # 8. Gestión del proyecto
 
-El repositorio usa la rama `main` para la versión de entrega, la rama `dev` para la integración y una rama `feature/*` por issue. Cada módulo se integró a `dev` mediante un pull request que cierra su issue y pasa la integración continua; `main` solo recibirá `dev` cuando el equipo lo apruebe. Los issues están etiquetados por módulo y por responsable, agrupados en el hito *Fase 1*, y el tablero Kanban de GitHub Projects los organiza en las columnas **Por hacer**, **Haciendo** y **Hecho**.
+El repositorio usa la rama `main` para la versión de entrega, la rama `dev` para la integración y una rama `feature/*` por issue. Cada módulo se integró a `dev` mediante un pull request que cierra su issue y pasa la integración continua; `main` recibió `dev` con el PR #46, una vez aprobada la versión, y está publicada como `v1.0-fase1`. Los issues están etiquetados por módulo y por responsable, agrupados en el hito *Fase 1*, y el tablero Kanban de GitHub Projects los organiza en las columnas **Por hacer**, **Haciendo** y **Hecho**.
 
 | Responsable | Issues |
 |------------------|---------------------------------------------------------------------------|
@@ -169,9 +169,9 @@ Las referencias 1 a 3 son las ediciones de la bibliografía del curso (aula virt
 
 **Forma de uso.** La herramienta actuó como asistente de desarrollo e implementación. A partir del enunciado (PDF adjunto) y de las instrucciones del equipo, generó el código fuente, las pruebas automatizadas, este informe y la organización del repositorio: ramas, issues, pull requests y tablero. El equipo indicó sus integrantes y el flujo de trabajo en GitHub (rama `main`, rama `dev` y ramas `feature/*` integradas mediante pull requests); la herramienta propuso la división en módulos y la asignación de issues.
 
-**Prompt principal** (textual, acompañado del enunciado en PDF):
+**Prompt principal** (redactado de forma ordenada a partir del mensaje original, con el mismo contenido; acompañado del enunciado en PDF):
 
-> Crea el repositorio del github tu, haz el proyecto y subelo a github. En el area del proyecto pon las cartas de "Por hacer", "haciendo" y "completado". Necesito que crees los issues y le asignes los issues necesarios a cada uno "Mario Sanches", "Roberto Ferrer" y a "Samantha Castro". Cada vez que hagas codigo ve haciendolo mediante un pull request. Vas a hacer dos ramas, la "main", la deb y las ramas features que es donde vas a hacer el codigo y vas a hacer el pr a la rama deb pero aun no lances nada a main
+> Crea el repositorio en GitHub, desarrolla el proyecto descrito en el enunciado adjunto y súbelo. En GitHub Projects, arma un tablero con las columnas «Por hacer», «Haciendo» y «Completado». Crea los issues necesarios y asígnalos entre Mario Sánchez, Roberto Ferrer y Samantha Castro. Todo el código debe entrar mediante pull requests. Trabaja con tres tipos de ramas: `main`, `dev` y ramas `feature/*`, donde se desarrolla el código. Los pull requests van hacia `dev`; por ahora no se integra nada en `main`.
 
 **Validación realizada durante el desarrollo.** Los resultados se contrastaron con cálculos manuales y con las salidas esperadas del enunciado mediante pruebas unitarias deterministas y escenarios ejecutados contra el binario real (66 y 5 en la primera versión; 93 y 8 al cierre, ver §7); se verificó la ausencia de condiciones de carrera con ThreadSanitizer y la ausencia de fugas con Valgrind, y se compiló sin advertencias con g++ y clang++.
 Cada pull request ejecuta esta batería en GitHub Actions.
