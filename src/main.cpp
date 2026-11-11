@@ -17,6 +17,7 @@
 
 #include "cli.hpp"
 #include "engine.hpp"
+#include "gui.hpp"
 #include "kernel.hpp"
 
 int main() {
@@ -37,6 +38,16 @@ int main() {
         kernel.requestShutdown();
         pthread_join(engineThread, nullptr);
         return 1;
+    }
+
+    // El hilo principal queda libre para la ventana gráfica (bonus). En macOS
+    // una ventana solo puede crearse y atenderse desde el hilo principal, así
+    // que la CLI no la abre: la pide con Kernel::requestGui() y este hilo, que
+    // dormía en pthread_cond_wait, la atiende hasta que se cierre.
+    // waitForGuiRequest() devuelve false cuando la CLI termina (exit).
+    while (kernel.waitForGuiRequest()) {
+        sim::runGui(kernel);
+        kernel.notifyGuiClosed();
     }
 
     pthread_join(cliThread, nullptr);     // la CLI termina con `exit` o fin de la entrada
