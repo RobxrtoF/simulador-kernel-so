@@ -15,11 +15,18 @@ rm -f "$CAPTURA"
 SALIDA=$({
     sleep 0.5
     printf 'set_speed 100\nload workloads/carga_mixta.txt\nstart\ngui\n'
-    sleep 5
+    # Espera a que la ventana guarde la captura en vez de un tiempo fijo: el
+    # primer arranque de una aplicación gráfica puede tardar varios segundos
+    # (hasta 40 s de margen; lo normal son 2 o 3).
+    for _ in $(seq 1 200); do
+        [[ -s $CAPTURA ]] && break
+        sleep 0.2
+    done
+    sleep 1
     printf 'gui\nps\n'      # con la ventana abierta: no se abre otra y la shell responde
-    sleep 1.5
+    sleep 1
     printf 'exit\n'
-} | SIM_GUI_SCREENSHOT="$CAPTURA" SIM_GUI_SCREENSHOT_DELAY=3 "$BIN" 2>&1)
+} | SIM_GUI_SCREENSHOT="$CAPTURA" SIM_GUI_SCREENSHOT_DELAY=2 "$BIN" 2>&1)
 ESTADO=$?
 
 FALLOS=0
