@@ -44,7 +44,7 @@ ctest --test-dir build-cmake --output-on-failure
 | Comando | Descripción |
 |---------|-------------|
 | `create <nombre> <burst_time> [prioridad]` | Crea un proceso (prioridad 1–5, defecto 3), le asigna un PID autoincremental y lo ingresa a la cola de LISTOS. |
-| `load <archivo>` | Carga por lotes un archivo de traza respetando los tiempos de llegada. Valida el archivo completo antes de crear procesos. |
+| `load <archivo>` | Carga por lotes un archivo de traza respetando los tiempos de llegada. Valida el archivo completo antes de crear procesos. Si se escribe solo el nombre y no está en el directorio actual, lo busca en `workloads/` (así `load workload_test.txt` funciona tal como lo escribe el enunciado). |
 | `ps` | Tabla con PID, nombre, estado, ráfaga restante y prioridad, más el reloj, la política y la cola de LISTOS. |
 | `pcb <PID>` | Detalle del Process Control Block: llegada, ráfaga inicial y restante, espera, retorno y respuesta. |
 | `set_sched <RR\|SRTF> [quantum]` | Cambia la política de planificación, incluso con el motor en marcha. Para `RR` el quantum es opcional (defecto 2). |

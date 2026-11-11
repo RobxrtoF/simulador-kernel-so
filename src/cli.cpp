@@ -234,7 +234,11 @@ void Cli::cmdCreate(const Args& args) {
 }
 
 void Cli::cmdLoad(const Args& args) {
-    const std::string& path = args[0];
+    // `load workload_test.txt` (como en el enunciado) también busca en workloads/.
+    const std::string path = resolveWorkloadPath(args[0]);
+    if (path != args[0]) {
+        out_ << "[INFO]: '" << args[0] << "' no está en el directorio actual; se usa '" << path << "'.\n";
+    }
     const LoadResult result = parseWorkloadFile(path);
 
     if (!result.fileOpened) {

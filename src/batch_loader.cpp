@@ -73,7 +73,21 @@ bool readField(const std::string& text, const std::string& field, long min, long
     return true;
 }
 
+/// true si `path` existe y es un archivo regular.
+bool isRegularFile(const std::string& path) {
+    struct stat info {};
+    return stat(path.c_str(), &info) == 0 && S_ISREG(info.st_mode);
+}
+
 }  // namespace
+
+std::string resolveWorkloadPath(const std::string& path, const std::string& searchDir) {
+    struct stat info {};
+    if (stat(path.c_str(), &info) == 0) return path;               // existe: se usa tal cual
+    if (path.empty() || path.find('/') != std::string::npos) return path;  // ruta explícita
+    const std::string candidate = searchDir + "/" + path;
+    return isRegularFile(candidate) ? candidate : path;
+}
 
 LoadResult parseWorkloadFile(const std::string& path) {
     LoadResult result;

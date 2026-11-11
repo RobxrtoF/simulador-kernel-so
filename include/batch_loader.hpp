@@ -42,6 +42,20 @@ struct LoadResult {
     bool ok() const { return fileOpened && errors.empty(); }
 };
 
+/// Carpeta del repositorio donde se guardan las trazas de ejemplo.
+constexpr const char* kWorkloadsDir = "workloads";
+
+/**
+ * @brief Ruta que debe usar `load` para `path`.
+ *
+ * Si `path` existe se usa tal cual. Si no existe y es un nombre simple (sin
+ * '/'), se busca también en `searchDir`: así `load workload_test.txt`, escrito
+ * como en el Escenario 2 del enunciado, encuentra `workloads/workload_test.txt`.
+ * Si tampoco está allí, devuelve `path` sin cambios para que el error informe
+ * la ruta que escribió el usuario.
+ */
+std::string resolveWorkloadPath(const std::string& path, const std::string& searchDir = kWorkloadsDir);
+
 /// Verifica que `path` exista y sea un archivo regular, lo lee y valida su formato.
 LoadResult parseWorkloadFile(const std::string& path);
 
