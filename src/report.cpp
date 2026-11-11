@@ -13,9 +13,12 @@ namespace sim {
 
 namespace {
 
-constexpr std::size_t kPidWidth = 8;
-constexpr std::size_t kMinNameWidth = 16;
-constexpr std::size_t kStateWidth = 14;
+// Anchos de columna de `ps` tal como los muestra el enunciado (sección 5):
+// PID 7, NOMBRE 15 (crece con nombres largos), ESTADO 13, BURST RESTANTE 18;
+// con PRIORIDAD el encabezado y la línea de guiones miden 62 caracteres.
+constexpr std::size_t kPidWidth = 7;
+constexpr std::size_t kMinNameWidth = 15;
+constexpr std::size_t kStateWidth = 13;
 constexpr std::size_t kBurstWidth = 18;
 
 /// Tiempo de retorno para mostrar: solo existe cuando el proceso terminó.

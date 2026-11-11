@@ -28,7 +28,7 @@ STATUS=$?
 
 echo "Escenario 4: bloqueo/desbloqueo y fin de la entrada"
 expect_text "$OUTPUT" "[OK]: Proceso PID 1 bloqueado (BLOCKED)."
-expect_text "$OUTPUT" "1       P1              BLOCKED       3s                3"
+expect_line "$OUTPUT" "1      P1             BLOCKED      3s                3"
 expect_text "$OUTPUT" "[OK]: Proceso PID 1 desbloqueado: vuelve a la cola de LISTOS (READY)."
 expect_line "$OUTPUT" "Estado Actual      : TERMINATED"
 expect_text "$OUTPUT" "[0-1s: P1] -> [1-3s: P2]"
