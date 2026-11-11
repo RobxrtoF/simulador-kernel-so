@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -149,7 +150,10 @@ bool Kernel::runNextTick() {
 }
 
 void Kernel::sleepOneTick() {
-    long elapsedMs = 0;
+    // El tiempo transcurrido se mide con un reloj monótono en vez de sumar los
+    // tramos pedidos a usleep: el sistema puede alargar cada espera (por ejemplo,
+    // macOS con la ventana gráfica en segundo plano) y el tick duraría de más.
+    const auto start = std::chrono::steady_clock::now();
     for (;;) {
         long targetMs;
         {
@@ -157,10 +161,11 @@ void Kernel::sleepOneTick() {
             if (shutdown_ || !running_) return;  // pausa o apagado: no seguir esperando
             targetMs = msPerTick_;               // set_speed se aplica de inmediato
         }
+        const long elapsedMs = static_cast<long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         if (elapsedMs >= targetMs) return;
         const long sliceMs = std::min<long>(kSleepSliceMs, targetMs - elapsedMs);
         usleep(static_cast<useconds_t>(sliceMs * 1000));  // retardo real SIN el mutex
-        elapsedMs += sliceMs;
     }
 }
 

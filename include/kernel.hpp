@@ -106,7 +106,9 @@ public:
      * @brief Retardo real de un tick (usleep por tramos cortos, sin el mutex).
      *
      * Termina antes si se pausa o se apaga el sistema, y aplica de inmediato
-     * un cambio de velocidad hecho con set_speed.
+     * un cambio de velocidad hecho con set_speed. La duración se mide con un
+     * reloj monótono, así que el tick dura lo configurado aunque usleep se
+     * alargue.
      */
     void sleepOneTick();
 
