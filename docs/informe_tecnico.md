@@ -51,7 +51,7 @@ La clase `Simulation` no usa hilos ni temporizadores: avanza exactamente un tick
 
 **Consultas por copia.** `ps`, `pcb`, `gantt` y `stats` obtienen una copia consistente del estado (`SystemSnapshot`) en una sola sección crítica y le dan formato fuera de ella. Solo el Hilo CLI escribe en la consola, por lo que las salidas no se mezclan.
 
-**Ventana gráfica (bonus).** El comando `gui` abre una ventana hecha con raylib que muestra en tiempo real la tabla de procesos, la CPU, las colas, las métricas y el diagrama de Gantt, y permite iniciar o pausar el reloj y cambiar la política, el quantum, el envejecimiento y la velocidad. La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join` (en macOS es obligatorio crearla y atenderla allí). El Hilo CLI no la abre: la pide con `Kernel::requestGui()`, que hace `pthread_cond_signal` sobre una segunda variable de condición; el hilo principal dormía en `pthread_cond_wait` (`waitForGuiRequest`) y despierta para abrirla, igual que con `exit`. En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, bajo el mutex, y dibuja esa copia; sus botones llaman a los mismos métodos que la CLI. No hay estado compartido nuevo fuera del `Kernel`. La interfaz es opcional (`make gui` o `cmake -DSIM_GUI=ON`): sin ella el proyecto no depende de raylib. Qué hay que instalar para usarla, con el paso a paso en Windows, está en el Anexo B.
+**Ventana gráfica (bonus).** El comando `gui` abre una ventana hecha con raylib que muestra en tiempo real la tabla de procesos, la CPU, las colas, las métricas y el diagrama de Gantt, y permite iniciar o pausar el reloj y cambiar la política, el quantum, el envejecimiento y la velocidad. La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join` (en macOS es obligatorio crearla y atenderla allí). El Hilo CLI no la abre: la pide con `Kernel::requestGui()`, que hace `pthread_cond_signal` sobre una segunda variable de condición; el hilo principal dormía en `pthread_cond_wait` (`waitForGuiRequest`) y despierta para abrirla, igual que con `exit`. En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, bajo el mutex, y dibuja esa copia; sus botones llaman a los mismos métodos que la CLI. No hay estado compartido nuevo fuera del `Kernel`. La interfaz es opcional (`make gui` o `cmake -DSIM_GUI=ON`): sin ella el proyecto no depende de raylib. Cómo instalar la librería está en el Anexo B.
 
 ![Interfaz gráfica del comando `gui` (bonus): Round Robin con quantum 2 a mitad de la ejecución.](img/gui_round_robin.png){width=88%}
 
@@ -191,52 +191,26 @@ Cada pull request ejecuta esta batería en GitHub Actions.
 - [x] Se registraron aquí los prompts adicionales usados durante la revisión, si los hubo.
 - [x] Observaciones del equipo sobre los resultados aportados por la herramienta: el código generado compiló y pasó sus pruebas desde la primera versión, pero la revisión posterior contra el enunciado y en otra plataforma encontró detalles que esas pruebas no cubrían: `ps` usaba columnas de 8/16/14 caracteres y 65 guiones en lugar de 7/15/13 y 62 (corregido en el PR #38); `load workload_test.txt`, escrito tal cual como en el Escenario 2, fallaba porque la traza está en `workloads/` (PR #36); `make e2e` fallaba en macOS con bash 3.2 (PR #33); y la documentación afirmaba que el envejecimiento no altera el Gantt ni las métricas, cuando sí los altera (lo detectó la revisión de los PR y se corrigió en el #43). Conclusión: que las pruebas pasen no basta; hay que comparar cada salida con el enunciado y probar en más de una plataforma.
 
-# Anexo B. Requisitos e instalación de la interfaz gráfica
+# Anexo B. Cómo instalar la librería de la interfaz gráfica
 
-La versión de consola solo necesita un compilador de C++17 con hilos POSIX. La interfaz gráfica (bonus, comando `gui`) necesita además **raylib 5.5** y las bibliotecas de desarrollo de ventanas (X11) y de gráficos (OpenGL) del sistema. raylib no se instala a mano: al compilar con CMake y la opción `-DSIM_GUI=ON`, CMake la descarga de GitHub y la compila junto con el proyecto. Es la misma receta que ejecuta la integración continua en cada cambio.
+La interfaz gráfica usa la librería **raylib**. Para descargarla usamos **Homebrew**, un instalador de paquetes: con el comando `brew` se pueden instalar varias herramientas y librerías desde la terminal. Así lo hizo el equipo en macOS:
 
-| Componente | Para qué | Cómo se obtiene |
-|------------|----------|-----------------|
-| `build-essential` (g++ y make) | Compilar el proyecto | `apt` |
-| `cmake` (3.16 o superior) y `git` | Configurar la compilación con interfaz y descargar el proyecto | `apt` |
-| `libgl1-mesa-dev`, `libgl1-mesa-dri` | OpenGL, con el que raylib dibuja | `apt` |
-| `libx11-dev`, `libxrandr-dev`, `libxinerama-dev`, `libxcursor-dev`, `libxi-dev` | Crear la ventana y leer el teclado y el ratón (X11) | `apt` |
-| raylib 5.5 | Biblioteca gráfica de la interfaz | CMake la descarga sola en la primera compilación (requiere internet) |
+```bash
+brew install raylib pkgconf      # descarga la librería raylib
+make gui                         # compila el simulador con la interfaz
+./simulador                      # y dentro de la shell: gui
+```
 
-**En Windows.** El proyecto usa hilos POSIX, por lo que en Windows se ejecuta dentro de WSL 2, el subsistema de Linux de Windows, como permite el enunciado. Para que las ventanas de Linux aparezcan en el escritorio hace falta Windows 11, o Windows 10 compilación 19044 o posterior: WSL 2 incluye WSLg, que se encarga de mostrarlas.
+Si Homebrew no está instalado, se instala una sola vez con el comando que aparece en su página, [brew.sh](https://brew.sh).
 
-1. **Instalar WSL con Ubuntu.** En PowerShell, abierto como administrador:
+**En Windows** Homebrew no está disponible. El proyecto corre dentro de WSL, el Linux que viene con Windows (`wsl --install` en PowerShell como administrador). Allí el instalador que cumple el papel de `brew` es `apt`, y CMake descarga raylib por su cuenta:
 
-    ```powershell
-    wsl --install
-    ```
+```bash
+sudo apt install build-essential cmake git libgl1-mesa-dev libgl1-mesa-dri \
+    libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+git clone https://github.com/RobxrtoF/simulador-kernel-so.git && cd simulador-kernel-so
+cmake -S . -B build-gui -DSIM_GUI=ON && cmake --build build-gui
+./build-gui/simulador            # y dentro de la shell: gui
+```
 
-    Reiniciar el equipo. Al abrir «Ubuntu» desde el menú Inicio por primera vez, pide crear un usuario y una contraseña de Linux. Si WSL ya estaba instalado, basta con ejecutar `wsl --update` y después `wsl --shutdown`.
-
-2. **Instalar las herramientas y bibliotecas,** en la terminal de Ubuntu:
-
-    ```bash
-    sudo apt update
-    sudo apt install -y build-essential cmake git libgl1-mesa-dev libgl1-mesa-dri \
-        libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
-    ```
-
-3. **Descargar el proyecto y compilarlo con la interfaz:**
-
-    ```bash
-    git clone https://github.com/RobxrtoF/simulador-kernel-so.git
-    cd simulador-kernel-so
-    cmake -S . -B build-gui -DSIM_GUI=ON
-    cmake --build build-gui -j
-    ```
-
-    La primera vez, CMake descarga raylib 5.5 y la compila; tarda uno o dos minutos.
-
-4. **Ejecutar:** `./build-gui/simulador`. Dentro de la shell, el comando `gui` abre la ventana en el escritorio de Windows; la consola sigue funcionando mientras la ventana está abierta, y `exit` cierra las dos.
-
-**Si algo falla.**
-
-- Si `gui` responde «[ERROR]: No se pudo abrir la ventana gráfica…», WSL no tiene acceso a la pantalla. En PowerShell, `wsl --update` y `wsl --shutdown`, y volver a abrir Ubuntu; dentro de Ubuntu, `echo $DISPLAY` debe mostrar `:0`. Sin ventana, la shell sigue funcionando.
-- Si la ventana se ve en negro o aparecen errores de OpenGL, actualizar el controlador de la tarjeta de video en Windows, como recomienda Microsoft para WSLg, o forzar el dibujo por software, como hace la integración continua: `LIBGL_ALWAYS_SOFTWARE=1 ./build-gui/simulador`.
-
-**En otros sistemas.** En Linux se siguen los pasos 2 a 4. En macOS: `brew install raylib pkgconf` y luego `make gui && ./simulador`. Sin la interfaz, en cualquier sistema basta con `make && ./simulador` (en Ubuntu solo hace falta `build-essential`).
+Para que la ventana se vea en Windows hace falta Windows 11 o Windows 10 actualizado.
