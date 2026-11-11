@@ -164,12 +164,13 @@ brew install raylib pkgconf
 make gui && ./simulador          # y dentro de la shell: gui
 
 # Linux / WSL (CMake descarga y compila raylib 5.5 si no está instalada)
-sudo apt install libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+sudo apt install build-essential cmake git libgl1-mesa-dev libgl1-mesa-dri \
+    libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 cmake -S . -B build-gui -DSIM_GUI=ON && cmake --build build-gui
 ./build-gui/simulador            # y dentro de la shell: gui
 ```
 
-En WSL hace falta WSLg (Windows 11) para mostrar ventanas. Si raylib ya está instalada y `pkg-config` la encuentra, `make gui` también funciona en Linux. Sin la interfaz compilada, `gui` lo explica y la shell sigue.
+En Windows el proyecto corre dentro de WSL 2; para ver la ventana hace falta Windows 11 o Windows 10 compilación 19044 o posterior (WSLg). El paso a paso, desde instalar WSL, está en el Anexo B del informe técnico. Si raylib ya está instalada y `pkg-config` la encuentra, `make gui` también funciona en Linux. Sin la interfaz compilada, `gui` lo explica y la shell sigue.
 
 **Cómo funciona con los hilos**
 

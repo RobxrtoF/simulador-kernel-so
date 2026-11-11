@@ -51,7 +51,7 @@ La clase `Simulation` no usa hilos ni temporizadores: avanza exactamente un tick
 
 **Consultas por copia.** `ps`, `pcb`, `gantt` y `stats` obtienen una copia consistente del estado (`SystemSnapshot`) en una sola sección crítica y le dan formato fuera de ella. Solo el Hilo CLI escribe en la consola, por lo que las salidas no se mezclan.
 
-**Ventana gráfica (bonus).** El comando `gui` abre una ventana hecha con raylib que muestra en tiempo real la tabla de procesos, la CPU, las colas, las métricas y el diagrama de Gantt, y permite iniciar o pausar el reloj y cambiar la política, el quantum, el envejecimiento y la velocidad. La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join` (en macOS es obligatorio crearla y atenderla allí). El Hilo CLI no la abre: la pide con `Kernel::requestGui()`, que hace `pthread_cond_signal` sobre una segunda variable de condición; el hilo principal dormía en `pthread_cond_wait` (`waitForGuiRequest`) y despierta para abrirla, igual que con `exit`. En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, bajo el mutex, y dibuja esa copia; sus botones llaman a los mismos métodos que la CLI. No hay estado compartido nuevo fuera del `Kernel`. La interfaz es opcional (`make gui` o `cmake -DSIM_GUI=ON`): sin ella el proyecto no depende de raylib.
+**Ventana gráfica (bonus).** El comando `gui` abre una ventana hecha con raylib que muestra en tiempo real la tabla de procesos, la CPU, las colas, las métricas y el diagrama de Gantt, y permite iniciar o pausar el reloj y cambiar la política, el quantum, el envejecimiento y la velocidad. La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join` (en macOS es obligatorio crearla y atenderla allí). El Hilo CLI no la abre: la pide con `Kernel::requestGui()`, que hace `pthread_cond_signal` sobre una segunda variable de condición; el hilo principal dormía en `pthread_cond_wait` (`waitForGuiRequest`) y despierta para abrirla, igual que con `exit`. En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, bajo el mutex, y dibuja esa copia; sus botones llaman a los mismos métodos que la CLI. No hay estado compartido nuevo fuera del `Kernel`. La interfaz es opcional (`make gui` o `cmake -DSIM_GUI=ON`): sin ella el proyecto no depende de raylib. Cómo instalar la librería está en el Anexo B.
 
 ![Interfaz gráfica del comando `gui` (bonus): Round Robin con quantum 2 a mitad de la ejecución.](img/gui_round_robin.png){width=88%}
 
@@ -190,3 +190,27 @@ Cada pull request ejecuta esta batería en GitHub Actions.
 - [ ] Se reprodujeron manualmente los Escenarios 1 y 2 y se compararon con el cálculo a mano del Gantt y las métricas.
 - [x] Se registraron aquí los prompts adicionales usados durante la revisión, si los hubo.
 - [x] Observaciones del equipo sobre los resultados aportados por la herramienta: el código generado compiló y pasó sus pruebas desde la primera versión, pero la revisión posterior contra el enunciado y en otra plataforma encontró detalles que esas pruebas no cubrían: `ps` usaba columnas de 8/16/14 caracteres y 65 guiones en lugar de 7/15/13 y 62 (corregido en el PR #38); `load workload_test.txt`, escrito tal cual como en el Escenario 2, fallaba porque la traza está en `workloads/` (PR #36); `make e2e` fallaba en macOS con bash 3.2 (PR #33); y la documentación afirmaba que el envejecimiento no altera el Gantt ni las métricas, cuando sí los altera (lo detectó la revisión de los PR y se corrigió en el #43). Conclusión: que las pruebas pasen no basta; hay que comparar cada salida con el enunciado y probar en más de una plataforma.
+
+# Anexo B. Cómo instalar la librería de la interfaz gráfica
+
+La interfaz gráfica usa la librería **raylib**. Para descargarla usamos **Homebrew**, un instalador de paquetes: con el comando `brew` se pueden instalar varias herramientas y librerías desde la terminal. Así lo hizo el equipo en macOS:
+
+```bash
+brew install raylib pkgconf      # descarga la librería raylib
+make gui                         # compila el simulador con la interfaz
+./simulador                      # y dentro de la shell: gui
+```
+
+Si Homebrew no está instalado, se instala una sola vez con el comando que aparece en su página, [brew.sh](https://brew.sh).
+
+**En Windows** Homebrew no está disponible. El proyecto corre dentro de WSL, el Linux que viene con Windows (`wsl --install` en PowerShell como administrador). Allí el instalador que cumple el papel de `brew` es `apt`, y CMake descarga raylib por su cuenta:
+
+```bash
+sudo apt install build-essential cmake git libgl1-mesa-dev libgl1-mesa-dri \
+    libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+git clone https://github.com/RobxrtoF/simulador-kernel-so.git && cd simulador-kernel-so
+cmake -S . -B build-gui -DSIM_GUI=ON && cmake --build build-gui
+./build-gui/simulador            # y dentro de la shell: gui
+```
+
+Para que la ventana se vea en Windows hace falta Windows 11 o Windows 10 actualizado.
