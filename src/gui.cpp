@@ -38,6 +38,10 @@
 #if defined(__APPLE__)
 #include <objc/message.h>
 #include <objc/runtime.h>
+#else
+#include <sys/stat.h>
+
+#include <cstring>
 #endif
 
 namespace sim {
@@ -92,6 +96,38 @@ void disableAppNap() {
 }
 #else
 void disableAppNap() {}
+#endif
+
+// ============================================================================
+// 0b. Linux: comprobar que hay servidor gráfico antes de crear la ventana
+// ============================================================================
+
+#if defined(__APPLE__)
+bool displayAvailable() { return true; }
+#else
+/**
+ * @brief true si hay un servidor gráfico al que conectarse.
+ *
+ * raylib 5.x no comprueba si pudo crear la ventana: sin servidor gráfico
+ * (sesión por SSH, WSL sin WSLg, un servidor de CI) sigue adelante, llama a
+ * OpenGL sin contexto y el proceso termina con una violación de segmento. La
+ * shell no debe caerse por pedir la ventana, así que se comprueba antes:
+ *   - Wayland: la variable WAYLAND_DISPLAY.
+ *   - X11 local (DISPLAY=":N"): que exista el socket /tmp/.X11-unix/XN.
+ *   - X11 remoto (DISPLAY="host:N", por ejemplo con ssh -X): se intenta.
+ * Si la comprobación se equivoca en un entorno poco común, SIM_GUI_FORCE=1 la omite.
+ */
+bool displayAvailable() {
+    if (std::getenv("SIM_GUI_FORCE") != nullptr) return true;
+    const char* wayland = std::getenv("WAYLAND_DISPLAY");
+    if (wayland != nullptr && *wayland != '\0') return true;
+    const char* display = std::getenv("DISPLAY");
+    if (display == nullptr || *display == '\0') return false;
+    if (display[0] != ':') return true;
+    const std::string number(display + 1, std::strcspn(display + 1, "."));
+    struct stat info {};
+    return stat(("/tmp/.X11-unix/X" + number).c_str(), &info) == 0;
+}
 #endif
 
 // ============================================================================
@@ -187,8 +223,12 @@ enum class Weight { Regular = 0, SemiBold = 1 };
  * @brief Fuentes de la interfaz, cargadas bajo demanda para cada tamaño.
  *
  * Cada tamaño se genera a la resolución real de la pantalla (tamaño x escala
- * HiDPI), de modo que el texto se ve nítido también en pantallas Retina. Si no
- * se encuentran los archivos de Inter se usa la fuente integrada de raylib.
+ * HiDPI), de modo que el texto se ve nítido también en pantallas Retina. En
+ * pantallas de densidad normal se genera al doble y se reduce al dibujar:
+ * raylib guarda el avance de cada letra en pixeles enteros, y con letras de
+ * 12 px ese redondeo deja el texto apretado; al doble de resolución el error
+ * se reduce a la mitad. Si no se encuentran los archivos de Inter se usa la
+ * fuente integrada de raylib.
  */
 class Fonts {
 public:
@@ -225,7 +265,8 @@ public:
     };
 
     const Entry& get(Weight weight, int size) {
-        const int pixels = std::max(8, static_cast<int>(std::lround(static_cast<float>(size) * scale_)));
+        const float oversample = scale_ < 1.5f ? 2.0f : 1.0f;  // pantallas 1x: ver el comentario de la clase
+        const int pixels = std::max(8, static_cast<int>(std::lround(static_cast<float>(size) * scale_ * oversample)));
         const std::pair<int, int> key{static_cast<int>(weight), pixels};
         auto it = cache_.find(key);
         if (it != cache_.end()) return it->second;
@@ -1204,14 +1245,21 @@ private:
 bool guiAvailable() { return true; }
 
 void runGui(Kernel& kernel) {
+    const auto reportFailure = [] {
+        std::cout << "\n[ERROR]: No se pudo abrir la ventana gráfica (¿hay un entorno gráfico disponible?). "
+                     "La consola sigue funcionando.\n"
+                  << std::flush;
+    };
+    if (!displayAvailable()) {   // Linux sin servidor gráfico: raylib 5.x se caería
+        reportFailure();
+        return;
+    }
     disableAppNap();             // macOS: la ventana oculta no frena el bucle ni el reloj
     SetTraceLogLevel(LOG_NONE);  // raylib no escribe en la consola: es de la shell
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI | FLAG_VSYNC_HINT);
     InitWindow(1320, 860, "Simulador de Kernel — Shell & Scheduling Engine");
     if (!IsWindowReady()) {
-        std::cout << "\n[ERROR]: No se pudo abrir la ventana gráfica (¿hay un entorno gráfico disponible?). "
-                     "La consola sigue funcionando.\n"
-                  << std::flush;
+        reportFailure();
         return;
     }
     SetWindowMinSize(1120, 740);
