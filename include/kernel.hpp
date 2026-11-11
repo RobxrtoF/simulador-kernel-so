@@ -9,7 +9,10 @@
  * ningún hilo lee o modifica los procesos sin exclusión mutua.
  *
  * Además usa una variable de condición (pthread_cond_t) para que el motor
- * duerma sin consumir CPU mientras está en pausa o no hay procesos pendientes.
+ * duerma sin consumir CPU mientras está en pausa o no hay procesos pendientes,
+ * y otra para que el hilo principal espere la orden de abrir la ventana
+ * gráfica (comando `gui`). La ventana lee el estado con snapshot() y actúa
+ * con los mismos métodos que la CLI, siempre bajo el mutex.
  *
  * Reglas de diseño:
  *  - El retardo real de cada tick (usleep) se hace SIN el mutex tomado, para
@@ -43,6 +46,7 @@ struct SystemSnapshot {
     std::string policy;                   ///< Descripción de la política activa.
     PolicyKind policyKind = PolicyKind::RoundRobin;  ///< Algoritmo activo.
     int agingInterval = kAgingOff;        ///< Envejecimiento de SRTF configurado (ticks).
+    int quantum = kDefaultQuantum;        ///< Quantum de Round Robin configurado (ticks).
     int runningPid = kNoPid;              ///< Proceso en EJECUCIÓN.
     bool cpuIdleWithPendingWork = false;  ///< CPU libre con procesos sin terminar.
     std::vector<PCB> processes;           ///< Todos los PCB, ordenados por PID.
@@ -87,6 +91,11 @@ public:
     bool pause();
     /// Pide al motor que termine (lo despierta si está esperando).
     void requestShutdown();
+    /**
+     * @brief Pide al hilo principal que abra la ventana gráfica (comando `gui`).
+     * @return false si la ventana ya está abierta o pedida, o si el sistema se está cerrando.
+     */
+    bool requestGui();
     /// Copia del PCB de `pid`. false si no existe.
     bool findProcess(int pid, PCB& out) const;
     /// Copia consistente de todo el estado (para ps, gantt, stats).
@@ -106,9 +115,26 @@ public:
      * @brief Retardo real de un tick (usleep por tramos cortos, sin el mutex).
      *
      * Termina antes si se pausa o se apaga el sistema, y aplica de inmediato
-     * un cambio de velocidad hecho con set_speed.
+     * un cambio de velocidad hecho con set_speed. La duración se mide con un
+     * reloj monótono, así que el tick dura lo configurado aunque usleep se
+     * alargue.
      */
     void sleepOneTick();
+
+    // ============ API usada por el hilo principal (ventana gráfica) ============
+
+    /**
+     * @brief Espera a que la CLI pida la ventana gráfica o el apagado.
+     *
+     * El hilo principal duerme en pthread_cond_wait (no consume CPU) mientras
+     * no haya nada que hacer. Devuelve true si debe abrir la ventana y false
+     * si se pidió terminar la simulación.
+     */
+    bool waitForGuiRequest();
+    /// El hilo principal avisa que la ventana se cerró: `gui` puede volver a abrirla.
+    void notifyGuiClosed();
+    /// true si ya se pidió terminar la simulación (la ventana debe cerrarse).
+    bool shutdownRequested() const;
 
     // ================= Cierre (tras pthread_join de ambos hilos) =================
 
@@ -120,9 +146,12 @@ private:
 
     mutable pthread_mutex_t mutex_;  ///< Protege TODO el estado que sigue.
     pthread_cond_t wakeEngine_;      ///< Despierta al motor (start, create, load, exit...).
+    pthread_cond_t wakeMain_;        ///< Despierta al hilo principal (gui, exit).
     Simulation sim_;                 ///< Procesos, colas, reloj y Gantt.
     bool running_ = false;           ///< Reloj de CPU en marcha (start/pause).
     bool shutdown_ = false;          ///< Se pidió terminar la simulación (exit).
+    bool guiRequested_ = false;      ///< La CLI pidió abrir la ventana gráfica.
+    bool guiOpen_ = false;           ///< El hilo principal tiene la ventana abierta.
     int msPerTick_ = kDefaultMsPerTick;
 };
 

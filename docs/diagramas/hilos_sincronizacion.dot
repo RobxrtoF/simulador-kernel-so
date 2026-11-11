@@ -4,7 +4,7 @@ digraph hilos {
   node  [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#F4F6F8", color="#5B6770", penwidth=1.2, margin="0.18,0.1"];
   edge  [fontname="DejaVu Sans", fontsize=9, color="#5B6770", fontcolor="#33393E"];
 
-  main [label="main()  —  hilo principal\npthread_create(CLI) · pthread_create(Motor)\npthread_join(CLI) → requestShutdown() → pthread_join(Motor)", fillcolor="#FFFFFF"];
+  main [label="main()  —  hilo principal  ·  ventana gráfica (bonus)\npthread_create(CLI) · pthread_create(Motor)\nwhile (waitForGuiRequest())  runGui();     // la ventana vive en este hilo\npthread_join(CLI) → requestShutdown() → pthread_join(Motor)", fillcolor="#FFFFFF"];
 
   cli [label="Hilo CLI  ·  cliThreadMain()\n\nlee stdin, valida y despliega\ncreate · load · ps · pcb · gantt · stats\nset_sched · set_speed · start · pause · exit", fillcolor="#E3F0FB", color="#2F6EA5"];
   eng [label="Hilo Motor de Scheduling  ·  engineThreadMain()\n\nwhile (runNextTick())   // 1 tick con el mutex\n    sleepOneTick();     // usleep() SIN el mutex", fillcolor="#FDF0E1", color="#C27A1B"];
@@ -13,7 +13,7 @@ digraph hilos {
     label="Kernel  —  estado compartido"; fontname="DejaVu Sans Bold"; fontsize=11;
     style="rounded,dashed"; color="#5B6770"; margin=16; labelloc="b";
     mutex [label="pthread_mutex_t  mutex_\nexclusión mutua de TODO el estado", fillcolor="#FBE3E3", color="#B03A3A"];
-    cond  [label="pthread_cond_t  wakeEngine_\nel motor duerme si está en pausa\no no hay procesos pendientes", fillcolor="#FBE3E3", color="#B03A3A"];
+    cond  [label="pthread_cond_t  wakeEngine_  ·  wakeMain_\nel motor duerme si está en pausa o sin procesos;\nel hilo principal, hasta que se pida la ventana", fillcolor="#FBE3E3", color="#B03A3A"];
     sim   [label="Simulation\ntabla de procesos (PCB) · cola de LISTOS · clock_ticks\npolítica RR / SRTF · diagrama de Gantt · métricas", fillcolor="#EAF5EA", color="#3C8D40"];
   }
 
@@ -22,9 +22,10 @@ digraph hilos {
 
   cli -> mutex [label="  MutexGuard: lock → operación → unlock\n  (consultas devuelven copias)"];
   eng -> mutex [label="  lock → step() → unlock"];
-  cli -> cond  [label="  signal: start, create,\n  load, unblock\n  broadcast: exit", style=dashed, color="#B03A3A", fontcolor="#B03A3A"];
+  cli -> cond  [label="  signal: start, create,\n  load, unblock, gui\n  broadcast: exit", style=dashed, color="#B03A3A", fontcolor="#B03A3A"];
   eng -> cond  [label="  pthread_cond_wait\n  (libera el mutex\n  mientras duerme)", style=dashed, color="#B03A3A", fontcolor="#B03A3A", dir=both, arrowtail=none];
   mutex -> sim [label="  protege", style=dotted];
+  main -> mutex [label="  ventana: snapshot() en cada cuadro\n  y las mismas operaciones que la CLI", color="#6B4FA5", fontcolor="#6B4FA5"];
 
   {rank=same; cli; eng}
   {rank=same; mutex; cond}

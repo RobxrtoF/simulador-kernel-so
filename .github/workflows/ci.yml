@@ -42,3 +42,46 @@ jobs:
         with:
           name: transcripciones-e2e
           path: tests/e2e/out/
+
+  # Bonus: la interfaz gráfica se compila en Linux con raylib y se prueba la
+  # ventana real dentro de una pantalla virtual (Xvfb, OpenGL por software).
+  gui:
+    name: Interfaz gráfica (raylib) en Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias de raylib (X11, OpenGL) y pantalla virtual
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev libgl1-mesa-dri libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev xvfb
+
+      - name: Compilar con la interfaz (CMake descarga raylib)
+        run: |
+          cmake -S . -B build-gui -DSIM_GUI=ON
+          cmake --build build-gui -j"$(nproc)"
+
+      - name: Pruebas unitarias con la interfaz compilada
+        run: ctest --test-dir build-gui --output-on-failure
+
+      - name: Ventana real en una pantalla virtual (captura incluida)
+        run: |
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "-screen 0 1400x900x24" \
+            tests/gui/prueba_ventana.sh build-gui/simulador
+
+      # Robustez: sin entorno gráfico, gui informa el error y la shell sigue.
+      - name: Sin pantalla, el comando gui no tumba la shell
+        run: |
+          salida=$(printf 'gui\ncreate P1 2\nps\nexit\n' | env -u DISPLAY -u WAYLAND_DISPLAY build-gui/simulador 2>&1)
+          echo "$salida"
+          grep -Fq "[ERROR]: No se pudo abrir la ventana gráfica" <<<"$salida"
+          grep -Fq "[OK]: Proceso 'P1' creado con PID 1" <<<"$salida"
+          grep -Fq "[OK]: Hilos detenidos y memoria liberada (1 PCB). Hasta luego." <<<"$salida"
+
+      - name: Guardar la captura de la interfaz
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captura-gui
+          path: tests/gui/out/

@@ -23,6 +23,7 @@
 
 #include "batch_loader.hpp"
 #include "gantt.hpp"
+#include "gui.hpp"
 #include "metrics.hpp"
 #include "parser.hpp"
 #include "report.hpp"
@@ -82,7 +83,7 @@ const std::vector<Cli::Command>& Cli::commands() {
         {"gantt", 0, 0, "gantt", "Diagrama de Gantt acumulado hasta el instante actual.", &Cli::cmdGantt},
         {"stats", 0, 0, "stats", "Métricas globales: espera, retorno, respuesta y uso de CPU.",
          &Cli::cmdStats},
-        {"gui", 0, 0, "gui", "Interfaz gráfica (bonus opcional; no incluida en esta versión).", &Cli::cmdGui},
+        {"gui", 0, 0, "gui", "Abre la interfaz gráfica en tiempo real (bonus; compilar con 'make gui').", &Cli::cmdGui},
         {"help", 0, 0, "help", "Muestra este manual rápido.", &Cli::cmdHelp},
         {"exit", 0, 0, "exit", "Detiene los hilos, libera la memoria y cierra la simulación.", &Cli::cmdExit},
     };
@@ -406,7 +407,17 @@ void Cli::cmdGantt(const Args&) {
 void Cli::cmdStats(const Args&) { out_ << renderStats(kernel_.snapshot().stats); }
 
 void Cli::cmdGui(const Args&) {
-    out_ << "[INFO]: La interfaz gráfica es un bonus opcional y no está incluida en esta versión.\n";
+    if (!guiAvailable()) {
+        out_ << "[INFO]: Este ejecutable se compiló sin la interfaz gráfica (bonus). "
+                "Compile con 'make gui' (requiere raylib) y vuelva a ejecutar ./simulador.\n";
+        return;
+    }
+    // La ventana la abre el hilo principal: aquí solo se le avisa (ver main.cpp).
+    if (!kernel_.requestGui()) {
+        out_ << "[INFO]: La interfaz gráfica ya está abierta.\n";
+        return;
+    }
+    out_ << "[OK]: Abriendo la interfaz gráfica. La consola sigue activa; cierre la ventana cuando quiera.\n";
 }
 
 void Cli::cmdHelp(const Args&) {

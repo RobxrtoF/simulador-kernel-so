@@ -75,6 +75,8 @@ public:
     void setAging(int ticks);
     /// Intervalo de envejecimiento configurado (kAgingOff = SRTF puro).
     int agingInterval() const { return agingInterval_; }
+    /// Último quantum configurado para Round Robin (se conserva mientras la política es SRTF).
+    int quantum() const { return quantum_; }
 
     // -------------------------------------------------------- avance del tiempo
     /// true si existe algún proceso sin terminar (hay trabajo pendiente).
@@ -111,6 +113,7 @@ private:
     long clock_ = 0;                            ///< Reloj simulado (ticks).
     int runningPid_ = kNoPid;                   ///< Proceso en EJECUCIÓN.
     int agingInterval_ = kAgingOff;             ///< Envejecimiento de SRTF (desactivado por defecto).
+    int quantum_ = kDefaultQuantum;             ///< Último quantum de Round Robin.
 };
 
 }  // namespace sim
