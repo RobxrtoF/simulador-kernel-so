@@ -4,6 +4,10 @@
 #    cmake -S . -B build-cmake
 #    cmake --build build-cmake
 #    ctest --test-dir build-cmake --output-on-failure
+#
+#  Con la interfaz gráfica (bonus):
+#    cmake -S . -B build-gui -DSIM_GUI=ON     (usa raylib si está instalada;
+#    cmake --build build-gui                   si no, la descarga y la compila)
 # =============================================================================
 cmake_minimum_required(VERSION 3.16)
 project(SimuladorKernel LANGUAGES CXX)
@@ -18,6 +22,19 @@ endif()
 # Hilos POSIX: equivale a compilar y enlazar con -pthread.
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+# Interfaz gráfica opcional (bonus). Se resuelve ANTES de fijar las advertencias
+# del proyecto para que no se apliquen al código de raylib.
+option(SIM_GUI "Compilar la interfaz gráfica del comando gui (requiere raylib)" OFF)
+if(SIM_GUI)
+  find_package(raylib QUIET)
+  if(NOT raylib_FOUND)
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(raylib URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz)
+    FetchContent_MakeAvailable(raylib)
+  endif()
+endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic -Wshadow)
 
@@ -35,6 +52,13 @@ if(SIM_SOURCES)
   target_include_directories(simcore PUBLIC include)
   target_link_libraries(simcore PUBLIC Threads::Threads)
   target_link_libraries(simulador PRIVATE simcore)
+  if(SIM_GUI)
+    target_compile_definitions(simcore PUBLIC SIM_WITH_GUI)
+    target_link_libraries(simcore PUBLIC raylib)
+    if(APPLE)
+      target_link_libraries(simcore PUBLIC objc)  # la ventana desactiva App Nap (ver src/gui.cpp)
+    endif()
+  endif()
 endif()
 
 enable_testing()
