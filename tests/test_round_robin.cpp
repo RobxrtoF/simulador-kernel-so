@@ -4,7 +4,9 @@
  */
 #include <deque>
 #include <string>
+#include <vector>
 
+#include "gantt.hpp"
 #include "simulation.hpp"
 #include "test_framework.hpp"
 
@@ -21,6 +23,24 @@ std::string queueToString(const std::deque<int>& queue) {
     std::string text;
     for (int pid : queue) text += (text.empty() ? "" : ",") + std::to_string(pid);
     return text;
+}
+
+/// Tramos del diagrama de Gantt tal como los imprime `gantt`, sin la línea de cabecera.
+std::string ganttLine(const Simulation& sim) {
+    const std::string text = renderGantt(sim.gantt().segments(), sim.clock(), false);
+    const std::size_t start = text.find('\n') + 1;
+    return text.substr(start, text.size() - start - 1);
+}
+
+/// Gantt de los procesos del Escenario 1 (ráfagas 5, 3 y 2, todos en t=0) con el quantum dado.
+std::string scenario1Gantt(int quantum) {
+    Simulation sim;
+    sim.setPolicy(PolicyKind::RoundRobin, quantum);
+    sim.createProcess("P1", 5, 2);
+    sim.createProcess("P2", 3, 1);
+    sim.createProcess("P3", 2, 3);
+    runToCompletion(sim);
+    return ganttLine(sim);
 }
 
 }  // namespace
@@ -125,6 +145,78 @@ TEST_CASE("RR: create asigna la llegada en el instante actual del reloj") {
     const PCB& b = sim.createProcess("B", 1, 3);
     CHECK_EQ(b.arrivalTime, 2L);
     CHECK_EQ(std::string(stateName(b.state)), "READY");
+}
+
+// ----------------------------------------------------------------------------
+// Casos borde del quantum (issue #29)
+// ----------------------------------------------------------------------------
+
+TEST_CASE("RR q=1: cambia de proceso en cada tick mientras haya otro en LISTOS") {
+    Simulation sim;
+    sim.setPolicy(PolicyKind::RoundRobin, 1);
+    sim.createProcess("P1", 3, 3);
+    sim.createProcess("P2", 2, 3);
+    sim.createProcess("P3", 1, 3);
+    runToCompletion(sim);
+
+    // Al agotar su quantum de 1 tick, cada proceso vuelve al final de la cola.
+    CHECK_EQ(ganttLine(sim), "[0-1s: P1] -> [1-2s: P2] -> [2-3s: P3] -> [3-4s: P1] -> [4-5s: P2] -> [5-6s: P1]");
+    // Todos los tramos duran 1 tick y ninguno repite el proceso del tramo anterior.
+    const std::vector<GanttSegment>& tramos = sim.gantt().segments();
+    CHECK_EQ(tramos.size(), static_cast<std::size_t>(6));
+    for (std::size_t i = 0; i < tramos.size(); ++i) {
+        CHECK_EQ(tramos[i].end - tramos[i].start, 1L);
+        if (i > 0) {
+            CHECK(tramos[i].pid != tramos[i - 1].pid);
+        }
+    }
+
+    const PCB* p1 = sim.table().find(1);
+    const PCB* p2 = sim.table().find(2);
+    const PCB* p3 = sim.table().find(3);
+    CHECK_EQ(p1->finishTime, 6L);
+    CHECK_EQ(p2->finishTime, 5L);
+    CHECK_EQ(p3->finishTime, 3L);
+    CHECK_EQ(p1->waitingTime, 3L);  // en LISTOS durante los ticks 1, 2 y 4
+    CHECK_EQ(p2->waitingTime, 3L);  // ticks 0, 2 y 3
+    CHECK_EQ(p3->waitingTime, 2L);  // ticks 0 y 1
+    CHECK_EQ(p1->responseTime(), 0L);
+    CHECK_EQ(p2->responseTime(), 1L);
+    CHECK_EQ(p3->responseTime(), 2L);
+}
+
+TEST_CASE("RR con quantum mayor que todas las ráfagas: se comporta como FCFS") {
+    // Procesos del Escenario 1 (ráfagas 5, 3 y 2, todos en t=0) con quantum 10.
+    Simulation sim;
+    sim.setPolicy(PolicyKind::RoundRobin, 10);
+    sim.createProcess("P1", 5, 2);
+    sim.createProcess("P2", 3, 1);
+    sim.createProcess("P3", 2, 3);
+    runToCompletion(sim);
+
+    // Nadie agota su quantum: cada proceso corre de principio a fin, en orden de llegada.
+    const std::string fcfs = "[0-5s: P1] -> [5-8s: P2] -> [8-10s: P3]";
+    CHECK_EQ(ganttLine(sim), fcfs);
+    CHECK_EQ(sim.gantt().segments().size(), static_cast<std::size_t>(3));  // un tramo por proceso
+
+    const PCB* p1 = sim.table().find(1);
+    const PCB* p2 = sim.table().find(2);
+    const PCB* p3 = sim.table().find(3);
+    CHECK_EQ(p1->finishTime, 5L);
+    CHECK_EQ(p2->finishTime, 8L);
+    CHECK_EQ(p3->finishTime, 10L);
+    CHECK_EQ(p1->waitingTime, 0L);
+    CHECK_EQ(p2->waitingTime, 5L);
+    CHECK_EQ(p3->waitingTime, 8L);
+    // Sin desalojos, la respuesta coincide con la espera (como en FCFS).
+    CHECK_EQ(p1->responseTime(), p1->waitingTime);
+    CHECK_EQ(p2->responseTime(), p2->waitingTime);
+    CHECK_EQ(p3->responseTime(), p3->waitingTime);
+
+    // Límite: con quantum igual a la ráfaga mayor (5), P1 termina justo al agotarlo
+    // y no vuelve a la cola, así que el resultado es el mismo.
+    CHECK_EQ(scenario1Gantt(5), fcfs);
+    CHECK_EQ(scenario1Gantt(100), fcfs);
 }
 
 TEST_CASE("Simulation: releaseAll libera todos los PCB") {
