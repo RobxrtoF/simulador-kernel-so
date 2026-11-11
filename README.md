@@ -9,6 +9,10 @@ Simulador, en C++17, del núcleo ejecutor de un sistema operativo de bajo consum
 
 Incluye el ciclo de vida completo del proceso con su **PCB** (NEW → READY → RUNNING → BLOCKED → TERMINATED), **carga por lotes** de archivos de traza, **diagrama de Gantt** y **métricas reales** (espera, retorno, respuesta y uso de CPU).
 
+Como bonus, el comando `gui` abre una **[interfaz gráfica](#interfaz-gráfica-bonus)** que muestra todo eso en tiempo real:
+
+![Interfaz gráfica: procesos, CPU, cola de LISTOS, métricas y diagrama de Gantt en tiempo real](docs/img/gui_round_robin.png)
+
 ## Requisitos
 
 - Linux, WSL (Windows) o macOS.
@@ -25,9 +29,10 @@ make            # compila ./simulador
 Otros objetivos:
 
 ```bash
-make test       # 77 pruebas unitarias
+make test       # 89 pruebas unitarias
 make e2e        # 7 escenarios contra el ejecutable real (incluye los del enunciado)
 make tsan       # todo lo anterior bajo ThreadSanitizer (detecta condiciones de carrera)
+make gui        # ./simulador con la interfaz gráfica (bonus; requiere raylib, ver más abajo)
 make clean
 ```
 
@@ -54,6 +59,7 @@ ctest --test-dir build-cmake --output-on-failure
 | `block <PID>` / `unblock <PID>` | Lleva un proceso a PAUSADO/BLOQUEADO y lo devuelve a LISTOS. |
 | `gantt` | Diagrama de Gantt acumulado hasta el instante actual. |
 | `stats` | Procesos finalizados, promedios de espera, retorno y respuesta, uso de CPU. |
+| `gui` | Abre la interfaz gráfica en tiempo real (bonus). Requiere compilar con `make gui`; si no, explica cómo hacerlo. La shell sigue activa. |
 | `help` | Manual rápido. |
 | `exit` | Detiene los hilos de forma limpia, libera la memoria y sale. |
 
@@ -108,11 +114,61 @@ Job_C, 1, 3, 3
 
 Los tiempos de llegada son **relativos al instante de la carga** (si se carga en t=0, coinciden con los del archivo). En `workloads/` hay cuatro trazas: la del enunciado, una carga mixta con un periodo ocioso, una que provoca inanición en SRTF (`inanicion_srtf.txt`, explicada más abajo) y un archivo con errores a propósito para demostrar la validación.
 
+## Interfaz gráfica (bonus)
+
+El comando `gui` abre una ventana auxiliar, hecha en C++ con [raylib](https://www.raylib.com), que muestra el estado del sistema mientras el Hilo Motor ejecuta. La shell no se bloquea: ventana y consola controlan el mismo `Kernel`.
+
+![SRTF con envejecimiento sobre la traza de inanición: Largo obtiene la CPU en t=8](docs/img/gui_srtf_envejecimiento.png)
+
+**Qué muestra**
+
+- **Procesos**: PID, nombre, estado, progreso de la ráfaga, ráfaga restante, prioridad, espera y llegada. La fila del proceso en ejecución va resaltada.
+- **CPU**: el proceso en ejecución con su avance, la porción de quantum consumida (Round Robin) o la ráfaga efectiva (SRTF con envejecimiento).
+- **Colas**: la cola de LISTOS en orden, los procesos que aún no llegan y los bloqueados.
+- **Indicadores**: reloj, procesos finalizados, promedios de espera, retorno y respuesta, y uso de CPU.
+- **Diagrama de Gantt** que crece tick a tick, con eje de tiempo, leyenda y detalle de cada tramo al pasar el cursor. Los tramos ociosos aparecen rayados.
+
+**Qué permite hacer**
+
+| Control | Acción | Equivale a |
+|---------|--------|------------|
+| Botón Iniciar / Pausar (o `Espacio`) | Inicia, pausa o reanuda el reloj de CPU | `start` / `pause` |
+| Selector RR / SRTF (o `R` / `S`) | Cambia la política en caliente | `set_sched` |
+| Quantum − / + | Ajusta el quantum de Round Robin | `set_sched RR <q>` |
+| Envejecimiento − / + | Activa o ajusta el envejecimiento de SRTF | `set_aging` |
+| Deslizador de velocidad | Entre 50 y 5000 ms por tick | `set_speed` |
+| Rueda, arrastre o `←` `→` sobre el Gantt | Recorre el historial; «Seguir en vivo» vuelve al final | — |
+
+**Cómo compilarla.** La interfaz es opcional: `make` no depende de raylib.
+
+```bash
+# macOS
+brew install raylib pkgconf
+make gui && ./simulador          # y dentro de la shell: gui
+
+# Linux / WSL (CMake descarga y compila raylib 5.5 si no está instalada)
+sudo apt install libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+cmake -S . -B build-gui -DSIM_GUI=ON && cmake --build build-gui
+./build-gui/simulador            # y dentro de la shell: gui
+```
+
+En WSL hace falta WSLg (Windows 11) para mostrar ventanas. Si raylib ya está instalada y `pkg-config` la encuentra, `make gui` también funciona en Linux. Sin la interfaz compilada, `gui` lo explica y la shell sigue.
+
+**Cómo funciona con los hilos**
+
+- La ventana vive en el **hilo principal**, que antes solo esperaba en `pthread_join`. En macOS es obligatorio que la ventana se cree y se atienda allí.
+- El Hilo CLI no abre la ventana: la pide con `Kernel::requestGui()`. El hilo principal duerme en `pthread_cond_wait` (`Kernel::waitForGuiRequest()`) y despierta para abrirla; `exit` también lo despierta.
+- En cada cuadro la ventana toma una copia con `Kernel::snapshot()`, **bajo el mutex**, y dibuja esa copia. Los botones llaman a los mismos métodos que la CLI (`start`, `pause`, `setPolicy`, `setAging`, `setSpeed`).
+- El Gantt se anima sin inventar datos: cada tick ya ejecutado se revela durante el retardo real de ese tick, y nunca se dibuja por delante del reloj del simulador.
+- La tipografía es [Inter](https://rsms.me/inter/) (licencia SIL OFL, incluida en `assets/fonts/`).
+
+`make gui-check` compila con la interfaz y prueba la ventana real (abre, captura y cierra). La CI hace lo mismo en Linux dentro de una pantalla virtual.
+
 ## Arquitectura
 
 ![Hilos y sincronización](docs/img/hilos_sincronizacion.png)
 
-- `main` crea el `Kernel` (estado compartido) y lanza los dos hilos con `pthread_create`; al recibir `exit` los espera con `pthread_join` y libera la memoria.
+- `main` crea el `Kernel` (estado compartido) y lanza los dos hilos con `pthread_create`; al recibir `exit` los espera con `pthread_join` y libera la memoria. Mientras tanto atiende la ventana gráfica si se pide con `gui`.
 - **Un único `pthread_mutex_t`** protege todo el estado (tabla de procesos, cola de LISTOS, reloj, Gantt, banderas). Cada operación lo toma y lo suelta mediante `MutexGuard` (RAII sobre `pthread_mutex_lock`/`pthread_mutex_unlock`).
 - El motor duerme en un `pthread_cond_t` cuando está en pausa o no hay procesos, y hace el retardo real de cada tick (`usleep`) **sin** el mutex, así la CLI responde de inmediato.
 - Las consultas (`ps`, `pcb`, `gantt`, `stats`) trabajan sobre copias tomadas en una sola sección crítica.
@@ -189,9 +245,10 @@ Bibliografía del curso: Silberschatz, Galvin y Gagne, *Fundamentos de Sistemas 
 ```text
 include/   cabeceras (.hpp) documentadas
 src/       implementación (.cpp)
-tests/     pruebas unitarias (mini framework propio) y escenarios e2e en Bash
+tests/     pruebas unitarias (mini framework propio), escenarios e2e en Bash y prueba de la ventana
 workloads/ archivos de traza para `load`
-docs/      informe técnico (PDF y Markdown), diagramas
+assets/    tipografía de la interfaz gráfica (Inter, licencia OFL)
+docs/      informe técnico (PDF y Markdown), diagramas y capturas
 Makefile, CMakeLists.txt, .github/workflows/ci.yml
 ```
 
@@ -206,7 +263,7 @@ Makefile, CMakeLists.txt, .github/workflows/ci.yml
 | Integrante | Módulos (issues asignados) |
 |------------|----------------------------|
 | Roberto Ferrer | Estructura y compilación · Concurrencia (hilos y mutex) · Motor de scheduling con Round Robin · Bloqueo de procesos |
-| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37) |
+| Mario Sánchez | PCB y tabla de procesos · SRTF apropiativo · Diagrama de Gantt y métricas · Carga por lotes · Aporte individual: inanición y envejecimiento en SRTF (#30), `make e2e` en macOS (#32), `load` como en el enunciado (#35), formato exacto de `ps` (#37), interfaz gráfica (bonus, #14) |
 | Samantha Castro | Parser y validación · Comandos de la CLI · Pruebas de escenarios · Documentación |
 
 ## Uso de Inteligencia Artificial
