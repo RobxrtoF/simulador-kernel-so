@@ -1,5 +1,7 @@
 # Simulador de Kernel y Gestor de Procesos en Consola
 
+[![CI](https://github.com/RobxrtoF/simulador-kernel-so/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RobxrtoF/simulador-kernel-so/actions/workflows/ci.yml)
+
 **Shell & Scheduling Engine** — Proyecto de Sistemas Operativos, Fase I · Universidad Católica Andrés Bello, Escuela de Ingeniería Informática · Cátedra Sistemas Operativos (Prof. Marcel J. Castro G.)
 
 Simulador, en C++17, del núcleo ejecutor de un sistema operativo de bajo consumo. Dos hilos POSIX trabajan en paralelo sobre una tabla de procesos protegida con `pthread_mutex_t`:
