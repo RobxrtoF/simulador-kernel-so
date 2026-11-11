@@ -31,8 +31,8 @@ make            # compila ./simulador
 Otros objetivos:
 
 ```bash
-make test       # 93 pruebas unitarias
-make e2e        # 8 escenarios contra el ejecutable real (incluye los del enunciado)
+make test       # 98 pruebas unitarias
+make e2e        # 9 escenarios contra el ejecutable real (incluye los del enunciado)
 make tsan       # todo lo anterior bajo ThreadSanitizer (detecta condiciones de carrera)
 make gui        # ./simulador con la interfaz gráfica (bonus; requiere raylib, ver más abajo)
 make clean
@@ -66,6 +66,8 @@ ctest --test-dir build-cmake --output-on-failure
 | `exit` | Detiene los hilos de forma limpia, libera la memoria y sale. |
 
 Errores de sintaxis, de tipo o de rango se informan con el formato del enunciado (`[ERROR DE SINTAXIS]`, `[ERROR DE TIPO]`, `[ERROR DE PARAMETRO]`, …) y la shell solicita la siguiente entrada.
+
+**Robustez.** La shell está probada contra entradas hostiles: basura binaria, números gigantes, líneas de 200 000 caracteres, archivos que no son de texto (`load /dev/zero`), y texto pegado desde un PDF o Word, cuyos caracteres invisibles (como el U+200B que trae el propio enunciado en `workload_test.txt`) se limpian solos. Ctrl+C no cierra la simulación: avisa que se sale con `exit`. Cada comando, el hilo motor y la ventana gráfica tienen su red de seguridad contra excepciones, así que un fallo inesperado se informa sin tumbar el programa.
 
 ## Ejemplos
 
