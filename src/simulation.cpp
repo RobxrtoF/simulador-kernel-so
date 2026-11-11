@@ -76,7 +76,8 @@ bool Simulation::unblockProcess(int pid, std::string& error) {
 // -------------------------------------------------------------- planificación
 
 void Simulation::setPolicy(PolicyKind kind, int quantum) {
-    policy_ = makePolicy(kind, quantum, agingInterval_);
+    if (kind == PolicyKind::RoundRobin) quantum_ = quantum > 0 ? quantum : kDefaultQuantum;
+    policy_ = makePolicy(kind, quantum_, agingInterval_);
     if (PCB* running = table_.find(runningPid_)) running->quantumUsed = 0;
 }
 

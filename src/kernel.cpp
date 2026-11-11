@@ -27,9 +27,16 @@ Kernel::Kernel() {
         pthread_mutex_destroy(&mutex_);
         throw std::runtime_error(std::string("pthread_cond_init: ") + std::strerror(rc));
     }
+    rc = pthread_cond_init(&wakeMain_, nullptr);
+    if (rc != 0) {
+        pthread_cond_destroy(&wakeEngine_);
+        pthread_mutex_destroy(&mutex_);
+        throw std::runtime_error(std::string("pthread_cond_init: ") + std::strerror(rc));
+    }
 }
 
 Kernel::~Kernel() {
+    pthread_cond_destroy(&wakeMain_);
     pthread_cond_destroy(&wakeEngine_);
     pthread_mutex_destroy(&mutex_);
 }
@@ -107,6 +114,15 @@ void Kernel::requestShutdown() {
     shutdown_ = true;
     running_ = false;
     pthread_cond_broadcast(&wakeEngine_);
+    pthread_cond_broadcast(&wakeMain_);  // el hilo principal deja de esperar la ventana
+}
+
+bool Kernel::requestGui() {
+    MutexGuard lock(mutex_);
+    if (shutdown_ || guiRequested_ || guiOpen_) return false;
+    guiRequested_ = true;
+    pthread_cond_signal(&wakeMain_);  // el hilo principal duerme en waitForGuiRequest()
+    return true;
 }
 
 bool Kernel::findProcess(int pid, PCB& out) const {
@@ -126,6 +142,7 @@ SystemSnapshot Kernel::snapshot() const {
     snap.policy = sim_.policy().describe();
     snap.policyKind = sim_.policy().kind();
     snap.agingInterval = sim_.agingInterval();
+    snap.quantum = sim_.quantum();
     snap.runningPid = sim_.runningPid();
     snap.cpuIdleWithPendingWork = sim_.cpuIdleWithPendingWork();
     snap.processes = sim_.table().snapshot();
@@ -167,6 +184,29 @@ void Kernel::sleepOneTick() {
         const long sliceMs = std::min<long>(kSleepSliceMs, targetMs - elapsedMs);
         usleep(static_cast<useconds_t>(sliceMs * 1000));  // retardo real SIN el mutex
     }
+}
+
+// ====================== API del hilo principal (ventana) ======================
+
+bool Kernel::waitForGuiRequest() {
+    MutexGuard lock(mutex_);
+    while (!shutdown_ && !guiRequested_) {
+        pthread_cond_wait(&wakeMain_, &mutex_);  // libera el mutex mientras duerme
+    }
+    if (shutdown_) return false;
+    guiRequested_ = false;
+    guiOpen_ = true;
+    return true;
+}
+
+void Kernel::notifyGuiClosed() {
+    MutexGuard lock(mutex_);
+    guiOpen_ = false;
+}
+
+bool Kernel::shutdownRequested() const {
+    MutexGuard lock(mutex_);
+    return shutdown_;
 }
 
 // ================================== Cierre ==================================
