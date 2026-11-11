@@ -11,6 +11,9 @@
  * memoria dinámica de los PCB.
  */
 #include <pthread.h>
+#include <unistd.h>
+
+#include <csignal>
 
 #include <cstring>
 #include <iostream>
@@ -20,7 +23,32 @@
 #include "gui.hpp"
 #include "kernel.hpp"
 
+namespace {
+
+/**
+ * Ctrl+C (SIGINT) no debe tumbar la simulación: se informa cómo salir y la shell
+ * sigue. Solo usa write(), que es seguro dentro de un manejador de señales. Con
+ * SA_RESTART, la lectura de la consola (getline) se reanuda sola tras la señal.
+ */
+void onInterrupt(int) {
+    static const char kMessage[] = "\n[INFO]: Ctrl+C no cierra la simulación. Escriba 'exit' para salir.\n> ";
+    const ssize_t written = write(STDOUT_FILENO, kMessage, sizeof kMessage - 1);
+    (void)written;
+}
+
+void installInterruptHandler() {
+    struct sigaction action {};
+    action.sa_handler = onInterrupt;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &action, nullptr);
+}
+
+}  // namespace
+
 int main() {
+    installInterruptHandler();  // antes de crear los hilos: todos heredan el manejador
+
     sim::Kernel kernel;  // estado compartido (mutex + variable de condición)
 
     pthread_t engineThread;

@@ -68,6 +68,41 @@ IntParse parseInteger(const std::string& text, long& value) {
     return IntParse::Ok;
 }
 
+std::string normalizeInput(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    const auto byte = [&](std::size_t i) { return static_cast<unsigned char>(text[i]); };
+    for (std::size_t i = 0; i < text.size();) {
+        const unsigned char c = byte(i);
+        if (c == 0xC2 && i + 1 < text.size() && byte(i + 1) == 0xA0) {  // U+00A0 espacio duro
+            out += ' ';
+            i += 2;
+            continue;
+        }
+        if (c == 0xE2 && i + 2 < text.size()) {
+            const unsigned char b1 = byte(i + 1), b2 = byte(i + 2);
+            if (b1 == 0x80 && b2 >= 0x80 && b2 <= 0x8A) { out += ' '; i += 3; continue; }  // U+2000..U+200A
+            if (b1 == 0x80 && b2 >= 0x8B && b2 <= 0x8D) { i += 3; continue; }              // U+200B..U+200D
+            if (b1 == 0x80 && b2 == 0xAF) { out += ' '; i += 3; continue; }                // U+202F
+            if (b1 == 0x80 && (b2 == 0x9C || b2 == 0x9D)) { out += '"'; i += 3; continue; } // “ ”
+            if (b1 == 0x81 && b2 == 0x9F) { out += ' '; i += 3; continue; }                // U+205F
+            if (b1 == 0x81 && b2 == 0xA0) { i += 3; continue; }                            // U+2060
+        }
+        if (c == 0xE3 && i + 2 < text.size() && byte(i + 1) == 0x80 && byte(i + 2) == 0x80) {  // U+3000
+            out += ' ';
+            i += 3;
+            continue;
+        }
+        if (c == 0xEF && i + 2 < text.size() && byte(i + 1) == 0xBB && byte(i + 2) == 0xBF) {  // U+FEFF
+            i += 3;
+            continue;
+        }
+        out += text[i];
+        ++i;
+    }
+    return out;
+}
+
 std::string trim(const std::string& text) {
     const char* whitespace = " \t\r\n";
     const std::size_t first = text.find_first_not_of(whitespace);

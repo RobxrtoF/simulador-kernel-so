@@ -127,14 +127,16 @@ El Hilo CLI separa cada línea en palabras (admite comillas dobles para rutas co
 
 `load` acepta la ruta tal como la escribe el enunciado: si `load workload_test.txt` no encuentra el archivo en el directorio actual, lo busca en `workloads/` y lo informa con una línea `[INFO]`. Las rutas explícitas y los errores de archivo no cambian.
 
+Al copiar y pegar desde un PDF o un procesador de texto se cuelan caracteres invisibles (el propio enunciado trae U+200B al final de las líneas de `workload_test.txt`); la shell y `load` los limpian antes de validar. Ctrl+C (SIGINT) no cierra la simulación: un manejador instalado con `sigaction` y `SA_RESTART` avisa que se sale con `exit`, y la lectura de la consola continúa. Además de la red de seguridad de cada comando, el hilo motor y la ventana gráfica atrapan cualquier excepción, de modo que un fallo inesperado se informa sin terminar el proceso.
+
 Si la entrada estándar no es una terminal, la shell repite cada comando en la salida, de modo que una sesión guionizada produce una transcripción legible. Al llegar al fin de la entrada sin `exit`, el sistema se cierra igual de forma ordenada.
 
 # 7. Pruebas y verificación
 
 | Verificación | Cómo se ejecuta | Resultado |
 |---------------------------------------------|------------------------------|--------------------|
-| 93 pruebas unitarias (PCB, parser, RR —incluidos sus casos borde de quantum—, SRTF —incluidos los ejemplos de Silberschatz, p. 145, y Stallings, fig. 8.5—, envejecimiento, Gantt, métricas, Kernel con hilos, CLI y sus ejemplos de `help`, lotes, bloqueo, vista de la interfaz gráfica y su coordinación entre hilos) | `make test` | 93/93 |
-| 8 escenarios contra el ejecutable real (Escenarios 1 y 2 —también con el `load` literal del enunciado—, robustez de la CLI, bloqueo y cierre, carga mixta con periodo ocioso en RR y SRTF, inanición y envejecimiento) | `make e2e` | 8/8 |
+| 98 pruebas unitarias (PCB, parser, RR —incluidos sus casos borde de quantum—, SRTF —incluidos los ejemplos de Silberschatz, p. 145, y Stallings, fig. 8.5—, envejecimiento, Gantt, métricas, Kernel con hilos, CLI y sus ejemplos de `help`, lotes, bloqueo, vista de la interfaz gráfica y su coordinación entre hilos, entradas hostiles) | `make test` | 98/98 |
+| 9 escenarios contra el ejecutable real (Escenarios 1 y 2 —también con el `load` literal del enunciado—, robustez de la CLI, bloqueo y cierre, carga mixta con periodo ocioso en RR y SRTF, inanición y envejecimiento, entradas extremas y Ctrl+C) | `make e2e` | 9/9 |
 | Condiciones de carrera | `make tsan` (ThreadSanitizer, unitarias + escenarios) | Sin reportes |
 | Fugas de memoria | Valgrind sobre el Escenario 2 completo | 0 bytes en uso al salir |
 | Portabilidad y advertencias | g++ 13 y clang++ con `-Wall -Wextra -Wpedantic -Wshadow`; Makefile y CMake; `make e2e` en Linux y en macOS (bash 3.2) | Sin advertencias |
